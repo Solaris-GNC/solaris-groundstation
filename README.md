@@ -16,15 +16,61 @@ sin el dashboard web.
 ## Instalación
 
 Las dependencias se gestionan con [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`).
-uv descarga él solo la versión de Python de `.python-version` (3.13).
+uv descarga él solo la versión de Python de `.python-version` (3.13): no hace falta instalar Python.
+
+### Linux
+
+**Ubuntu / Debian**
 
 ```bash
-sudo dnf install uv              # o: curl -LsSf https://astral.sh/uv/install.sh | sh
-uv sync                          # crea .venv con la app y las herramientas de desarrollo
+sudo apt install git curl libxcb-cursor0          # libxcb-cursor0: la necesita Qt para abrir ventanas
+curl -LsSf https://astral.sh/uv/install.sh | sh   # instala uv en ~/.local/bin (abre otra terminal)
+sudo usermod -aG dialout $USER                    # permiso para el puerto serie (cerrar sesión y volver a entrar)
 ```
 
-Los comandos de abajo se lanzan con `uv run` delante (`uv run python -m groundstation`), o
-activando antes el entorno con `source .venv/bin/activate`.
+**Fedora**
+
+```bash
+sudo dnf install git uv xcb-util-cursor           # xcb-util-cursor: la necesita Qt para abrir ventanas
+sudo usermod -aG dialout $USER                    # permiso para el puerto serie (cerrar sesión y volver a entrar)
+```
+
+Después, en las dos:
+
+```bash
+git clone <url-del-repo> solaris-groundstation
+cd solaris-groundstation
+uv sync                                           # crea .venv con la app y las herramientas de desarrollo
+uv run python -m groundstation                    # busca el receptor solo
+```
+
+### Windows
+
+En PowerShell:
+
+```powershell
+winget install --id Git.Git -e
+winget install --id astral-sh.uv -e               # o: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Cerrar y volver a abrir PowerShell (para que encuentre `git` y `uv`), y después:
+
+```powershell
+git clone <url-del-repo> solaris-groundstation
+cd solaris-groundstation
+uv sync
+uv run python -m groundstation --port COM3
+```
+
+- En Windows hay que indicar el puerto: la búsqueda automática solo mira las rutas de Linux
+  (`/dev/...`). El número sale en el Administrador de dispositivos, en "Puertos (COM y LPT)".
+- Si el receptor no aparece ahí, falta el driver de su chip USB-serie (CP210x o CH340, según
+  la placa).
+
+### Gestión de dependencias
+
+Los comandos se lanzan con `uv run` delante (`uv run python -m groundstation`), o activando antes
+el entorno: `source .venv/bin/activate` en Linux, `.venv\Scripts\activate` en Windows.
 
 - Añadir una dependencia: `uv add paquete` (desarrollo: `uv add --dev paquete`).
 - Actualizar versiones: `uv lock --upgrade` y `uv sync`.
@@ -36,7 +82,7 @@ Desde la raíz del repo:
 
 ```bash
 uv run python -m groundstation                     # busca el receptor solo
-uv run python -m groundstation --port /dev/serial/by-id/usb-...
+uv run python -m groundstation --port /dev/serial/by-id/usb-...   # Windows: --port COM3
 uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite un log grabado
 ```
 
