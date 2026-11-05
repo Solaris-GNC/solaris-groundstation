@@ -1,66 +1,53 @@
+import struct
+
 import pytest
-import telemetry.decoder as decoder
-from telemetry.models import (K_SPP_PKT_VERSION, APID_BARO, APID_IMU,
-TelemetryPacket, SPPPrimaryHeader, SPPSecondaryHeader)
+
+from telemetry.decoder import Decoder
+from telemetry.models import (
+    APID_BARO, APID_IMU, BAROPacket, FSMPacket, IMUPacket, K_SPP_PKT_VERSION, KPID_FSM,
+)
 
 
-@pytest.fixture
-def correct_frame():
-    version = [K_SPP_PKT_VERSION]
-    apid = [APID_IMU, 0]
-    seq = [1, 0]
-    payload_len = [48, 0]
-    timestamp = [255, 0, 0, 0]
-    drop_counter = [99]
-    payload = [0] * 48
-    payload[0] = 255
-    crc = [1, 1]                    # 256
-
-    frame = bytes(version + apid + seq + payload_len + timestamp +
-                  drop_counter + payload + crc)
-    return frame
+def make_frame(apid: int, payload: bytes, seq: int = 1, timestamp_ms: int = 255,
+               drop_counter: int = 99, crc: int = 256) -> bytes:
+    """Trama SPP: versión, APID, seq, payload_len, timestamp, drop counter, payload, CRC."""
+    return (struct.pack("<BHHHIB", K_SPP_PKT_VERSION, apid, seq, len(payload), timestamp_ms, drop_counter)
+            + payload + struct.pack("<H", crc))
 
 
-def test_everything_goes_fine(correct_frame):
-
-    packet = decoder.Decoder()
-    packet = decoder.Decoder.frame_to_packet(correct_frame)
-
-    assert packet.primary_header.version == K_SPP_PKT_VERSION and isinstance(packet.primary_header.version, int)
-    assert packet.primary_header.apid == APID_IMU and isinstance(packet.primary_header.apid, int)
-    assert packet.primary_header.seq == 1 and isinstance(packet.primary_header.seq, int)
-    assert packet.primary_header.payload_len == 48 and isinstance(packet.primary_header.payload_len, int)
-
-    assert packet.secondary_header.timestamp_ms == 255 and isinstance(packet.secondary_header.timestamp_ms, int)
-    assert packet.secondary_header.drop_counter == 99 and isinstance(packet.secondary_header.drop_counter, int)
-
-    assert packet.payload == 255 and isinstance(packet.payload, int)
-    assert packet.crc16 == 256 and isinstance(packet.crc16, int)
+def test_headers_are_decoded():
+    packet = Decoder().frame_to_packet(make_frame(APID_BARO, struct.pack("<3f", 0, 0, 0)))
+    assert packet.primary_header.version == K_SPP_PKT_VERSION
+    assert packet.primary_header.apid == APID_BARO
+    assert packet.primary_header.seq == 1
+    assert packet.primary_header.payload_len == 12
+    assert packet.secondary_header.timestamp_ms == 255
+    assert packet.secondary_header.drop_counter == 99
+    assert packet.crc16 == 256
 
 
+def test_baro_payload():
+    packet = Decoder().frame_to_packet(make_frame(APID_BARO, struct.pack("<3f", 704.5, 93140.0, 27.25)))
+    assert isinstance(packet.payload, BAROPacket)
+    assert (packet.payload.altitude, packet.payload.pressure, packet.payload.temperature) == (704.5, 93140.0, 27.25)
 
 
+def test_imu_payload():
+    values = [0.5, -1.0, 1.0, 10.0, -20.0, 30.0, 1.0, 0.0, 0.0, 0.0, 3.0]
+    packet = Decoder().frame_to_packet(make_frame(APID_IMU, struct.pack("<11f", *values)))
+    p = packet.payload
+    assert isinstance(p, IMUPacket)
+    assert [p.accel_x, p.accel_y, p.accel_z, p.gyro_x, p.gyro_y, p.gyro_z,
+            p.quat_w, p.quat_x, p.quat_y, p.quat_z, p.accuracy] == values
 
 
+def test_fsm_payload_lists_failed_bits():
+    # Bit 7 de FsmErrors_t (icmInitError) y bit 0 de CommonBitErrors_t (coreInitError)
+    packet = Decoder().frame_to_packet(make_frame(KPID_FSM, struct.pack("<2H", 1 << 7, 1), seq=0))
+    assert isinstance(packet.payload, FSMPacket)
+    assert packet.payload.failed == ["icmInitError", "coreInitError"]
 
 
-
-
-
-
-
-
-
-
-@pytest.fixture
-def too_big_baro_payload():
-
-    return
-
-
-
-
-def test_baro_payload_decoder_overflow():
-    return
-
-
+def test_unknown_payload_length_is_rejected():
+    with pytest.raises(ValueError):
+        Decoder().frame_to_packet(make_frame(APID_IMU, bytes(20)))

@@ -61,5 +61,4 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
 uv run pytest
 ```
 
-Las rutas de los tests están en `pyproject.toml`. `backend/tests/telemetry` se deja fuera porque
-`test_decoder.py` está roto.
+Las rutas de los tests están en `pyproject.toml`.
