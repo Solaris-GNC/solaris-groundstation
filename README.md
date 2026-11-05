@@ -4,9 +4,6 @@ Estación de tierra de escritorio para ver la telemetría de Solaris en directo.
 que lee el puerto serie del receptor y pinta, sin servidor, sin localhost y sin navegador.
 Tema de día y de noche con la fuente Oxanium.
 
-Viene de [solaris-live-telemetry](https://github.com/Software-Solaris/solaris-live-telemetry),
-sin el dashboard web.
-
 ## Estructura
 
 - `groundstation/`: la app (PySide6 + pyqtgraph).
@@ -38,7 +35,7 @@ sudo usermod -aG dialout $USER                    # permiso para el puerto serie
 Después, en las dos:
 
 ```bash
-git clone <url-del-repo> solaris-groundstation
+git clone https://github.com/Solaris-GNC/solaris-groundstation.git
 cd solaris-groundstation
 uv sync                                           # crea .venv con la app y las herramientas de desarrollo
 uv run python -m groundstation                    # busca el receptor solo
