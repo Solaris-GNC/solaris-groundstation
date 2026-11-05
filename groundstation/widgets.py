@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QPointF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QPolygonF, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
     QTextBrowser, QVBoxLayout, QWidget,
@@ -23,6 +23,17 @@ def fmt(value: float | None, digits: int = 1) -> str:
     s = f"{value:.{digits}f}"
     # Valores negativos que redondean a cero: '-0.0' -> '0.0'
     return s[1:] if s.startswith("-") and float(s) == 0 else s
+
+
+def toggle_fullscreen(window: QWidget):
+    window.showNormal() if window.isFullScreen() else window.showFullScreen()
+
+
+def install_fullscreen_keys(window: QWidget):
+    """F11 pone o quita la pantalla completa; Esc la quita."""
+    QShortcut(QKeySequence(Qt.Key_F11), window, lambda: toggle_fullscreen(window))
+    QShortcut(QKeySequence(Qt.Key_Escape), window,
+              lambda: window.showNormal() if window.isFullScreen() else None)
 
 
 def set_state(widget: QWidget, state: str):

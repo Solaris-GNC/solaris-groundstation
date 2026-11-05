@@ -25,7 +25,7 @@ from PySide6.QtCore import QLineF, QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
-from .widgets import Panel, fmt
+from .widgets import Panel, fmt, install_fullscreen_keys, toggle_fullscreen
 
 # Cámara por defecto: desde +X (desde donde estás tú mirando la cara de la placa), algo elevada
 DEFAULT_AZIMUTH = 0.0      # Grados, desde +X hacia +Y
@@ -221,11 +221,11 @@ class AttitudeView(QWidget):
             painter.setPen(QColor(c["text_strong"]))
             painter.drawText(QPointF(x + 100, y + i * line), f"{fmt(value)}°")
         painter.setPen(QColor(c["muted"]))
-        painter.drawText(QPointF(x, self.height() - 12), "Arrastrar: girar la vista · doble clic: volver")
+        painter.drawText(QPointF(x, self.height() - 12), "Arrastrar: girar la vista · doble clic: volver · F11: pantalla completa")
 
 
 class OrientationWindow(QMainWindow):
-    """Ventana aparte con el cohete en 3D.
+    """Ventana aparte con el cohete en 3D. F11 (o el botón) la pone a pantalla completa.
 
     La rellena la ventana principal (MainWindow._redraw) solo mientras está abierta.
     """
@@ -249,12 +249,17 @@ class OrientationWindow(QMainWindow):
         center.setToolTip("Con el cohete en vertical y la cara de componentes de la placa hacia ti:\n"
                           "la vista se orienta desde donde estás tú. Solo afecta a esta vista")
         center.clicked.connect(self.center_requested.emit)
-        center.setCursor(Qt.PointingHandCursor)
-        view_panel.head_layout.addWidget(center)
+        full = QPushButton("Pantalla completa", objectName="topButton")
+        full.setToolTip("Pantalla completa (F11). Esc o F11 para salir")
+        full.clicked.connect(lambda: toggle_fullscreen(self))
+        for button in (center, full):
+            button.setCursor(Qt.PointingHandCursor)
+            view_panel.head_layout.addWidget(button)
         view_panel.body.setContentsMargins(0, 0, 0, 0)
         self.view = AttitudeView()
         view_panel.body.addWidget(self.view, 1)
         layout.addWidget(view_panel)
+        install_fullscreen_keys(self)
 
     def set_theme(self, c: dict, family: str):
         self.view.set_theme(c, family)

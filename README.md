@@ -59,6 +59,7 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
   desvía decenas de grados en segundos con la placa quieta. "Centrar vista", con el cohete en
   vertical y la cara de componentes de la placa hacia ti, orienta la vista desde donde estás.
   Arrastrar con el ratón gira la vista; doble clic la devuelve a la inicial.
+- F11 pone a pantalla completa la ventana activa (la principal o la 3D); Esc la quita.
 - "Fijar rampa" (bloque Medidas): con el cohete en la rampa, la altitud actual (media de 2 s) pasa
   a ser 0 y se borran el apogeo y la aceleración máxima acumulados en tierra, para que en vuelo no
   arrastren la deriva del barómetro durante la espera. No toca la actitud. Los CSV guardan siempre

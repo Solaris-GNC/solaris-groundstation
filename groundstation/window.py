@@ -18,7 +18,7 @@ from .store import Store
 from .theme import LOGOS, THEMES, stylesheet
 from .widgets import (
     EventLog, GroundButtons, InitBitsPanel, Segmented, StatCard, TimePlot, Zone, break_wraps, fmt,
-    grid_of, set_state, status_text,
+    grid_of, install_fullscreen_keys, set_state, status_text,
 )
 
 REFRESH_MS = 100  # Ritmo de refresco
@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         self.resize(1440, 900)
         self.orientation = OrientationWindow(self)
         self.orientation.center_requested.connect(self.center_view)
+        install_fullscreen_keys(self)
         self._build()
         self.apply_theme(self.theme)
         if self.settings.value("orientation_open", False, type=bool):
@@ -163,7 +164,7 @@ class MainWindow(QMainWindow):
 
         orientation = QPushButton("Orientación 3D", objectName="topButton")
         orientation.setCursor(Qt.PointingHandCursor)
-        orientation.setToolTip("Abre una ventana con el cohete en 3D")
+        orientation.setToolTip("Abre una ventana con el cohete en 3D (F11: pantalla completa)")
         orientation.clicked.connect(self.open_orientation)
         layout.addWidget(orientation)
 
@@ -339,6 +340,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Se recuerda si la ventana de orientación estaba abierta y dónde, para la próxima vez
+        if self.orientation.isFullScreen():
+            self.orientation.showNormal()  # Se guarda el tamaño normal, no el de pantalla completa
         self.settings.setValue("orientation_open", self.orientation.isVisible())
         self.settings.setValue("orientation_geometry", self.orientation.saveGeometry())
         self.orientation.close()
