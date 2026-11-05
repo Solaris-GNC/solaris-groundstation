@@ -52,7 +52,6 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
 - Llega cada paquete a la pantalla, sin pasar por un servidor.
 - Las gráficas reciben solo la ventana visible y se repintan solo con datos nuevos. Si repintar
   tarda (sesiones muy largas en "Todo"), se repinta menos a menudo en vez de congelarse.
-- El mapa GPS aún no está: el firmware no envía posición.
 - La fuente Oxanium va en `groundstation/assets/fonts` con su licencia (SIL OFL 1.1).
 
 ## Tests

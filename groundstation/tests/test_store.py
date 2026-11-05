@@ -27,19 +27,35 @@ def add_imu(store, ts, quat=QUAT_UP, accel=(0.0, 0.0, 1.0)):
 # Actitud
 
 def test_attitude_upright_is_zero():
-    assert attitude(*QUAT_UP) == pytest.approx((0, 0, 0))
+    assert attitude(*QUAT_UP) == pytest.approx((0, 0, 0, 0))
 
 
-@pytest.mark.parametrize("tilt", [30, 80])
-@pytest.mark.parametrize("spin", [0, 90, 180, 270])
-def test_attitude_ignores_spin_about_rocket_axis(tilt, spin):
-    # Inclinado `tilt` grados y girado `spin` sobre su propio eje: la inclinación no debe cambiar
-    # (con roll/pitch de Euler pasaba de un ángulo al otro)
+@pytest.mark.parametrize("tilt", [10, 30, 80])
+@pytest.mark.parametrize("spin", [-150, 0, 45, 90, 170])
+def test_spin_only_moves_roll(tilt, spin):
+    # Inclinado `tilt` grados y girado `spin` sobre su propio eje: pitch e inclinación no cambian
+    # y todo el giro va al roll (con el orden de avión ZYX se repartía entre roll y pitch)
     q = quat_mul(axis_angle((1, 0, 0), tilt), axis_angle((0, 0, 1), spin))
-    t, lean_x, lean_y = attitude(*q)
+    t, roll, pitch, yaw = attitude(*q)
     assert t == pytest.approx(tilt)
-    assert lean_x == pytest.approx(0, abs=1e-9)
-    assert lean_y == pytest.approx(-tilt)
+    assert pitch == pytest.approx(tilt)
+    assert yaw == pytest.approx(0, abs=1e-9)
+    assert roll == pytest.approx(spin)
+
+
+@pytest.mark.parametrize("tilt", [10, 60])
+def test_yaw_is_tilt_about_y(tilt):
+    t, roll, pitch, yaw = attitude(*axis_angle((0, 1, 0), tilt))
+    assert (t, roll, pitch, yaw) == pytest.approx((tilt, 0, 0, tilt), abs=1e-9)
+
+
+def test_pitch_and_yaw_combined():
+    # Pitch 20º y después yaw 30º: se recuperan los dos, con y sin giro sobre el eje
+    for spin in (0, 120):
+        q = quat_mul(quat_mul(axis_angle((1, 0, 0), 20), axis_angle((0, 1, 0), 30)),
+                     axis_angle((0, 0, 1), spin))
+        _, roll, pitch, yaw = attitude(*q)
+        assert (roll, pitch, yaw) == pytest.approx((spin, 20, 30))
 
 
 # ==================================================================

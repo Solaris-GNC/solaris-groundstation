@@ -35,26 +35,43 @@ INIT_MODULES = [
 ]
 
 
-def attitude(w: float, x: float, y: float, z: float) -> tuple[float, float, float]:
-    """Actitud a partir de la dirección del eje del cohete en el marco del mundo (Z arriba).
+# Ejes del cuerpo reordenados (permutación cíclica, conserva la orientación) para que el eje
+# del cohete haga de Z
+_BODY_AXES = {"x": (1, 2, 0), "y": (2, 0, 1), "z": (0, 1, 2)}
 
-    No se usan ángulos de Euler: con el eje del cohete en Z, el giro sobre su propio eje se
-    reparte entre roll y yaw y, cerca de 90º de pitch, ambos se acoplan (gimbal lock).
-    Devuelve (tilt, lean_x, lean_y) en grados:
-      tilt: ángulo entre el eje y la vertical (0 = recto hacia arriba)
-      lean_x / lean_y: inclinación del eje hacia +X / +Y del mundo
+
+def attitude(w: float, x: float, y: float, z: float) -> tuple[float, float, float, float]:
+    """Actitud del cohete en grados: (tilt, roll, pitch, yaw).
+
+    Ángulos de Euler en orden X-Y-Z (pitch, después yaw, y el roll al final, sobre el eje del
+    propio cohete). No se usa el orden de avión (ZYX): con el cohete en vertical, ese orden reparte
+    el giro sobre su eje entre roll y pitch, y su singularidad (gimbal lock) cae justo en vertical.
+    Con X-Y-Z:
+      - pitch y yaw solo dependen de hacia dónde apunta el cohete: girar sobre su eje no los mueve
+      - roll es solo el giro sobre el eje del cohete
+      - la singularidad queda con el cohete en horizontal (yaw = ±90º)
+    Con el cohete recto hacia arriba los tres valen 0.
+      tilt: ángulo entre el eje del cohete y la vertical
+      pitch: inclinación sobre el eje X del mundo (positivo: el morro va hacia -Y)
+      yaw: inclinación sobre el eje Y del mundo (positivo: el morro va hacia +X)
+      roll: giro sobre el eje del cohete, entre -180 y 180
+    Los ejes X/Y del mundo los fija el DMP con el magnetómetro, así que el roll absoluto
+    depende de su calibración; su variación (el giro) es fiable.
     """
-    # Columna de la matriz de rotación (cuerpo -> mundo) correspondiente al eje del cohete
-    ux, uy, uz = {
-        "x": (1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)),
-        "y": (2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)),
-        "z": (2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)),
-    }[ROCKET_AXIS]
-    return (
-        math.degrees(math.acos(max(-1.0, min(1.0, uz)))),
-        math.degrees(math.atan2(ux, uz)),
-        math.degrees(math.atan2(uy, uz)),
+    # Matriz de rotación cuerpo -> mundo
+    r = (
+        (1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)),
+        (2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)),
+        (2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)),
     )
+    i, j, k = _BODY_AXES[ROCKET_AXIS]
+    r = [(row[i], row[j], row[k]) for row in r]
+    # R = Rx(pitch) · Ry(yaw) · Rz(roll)
+    tilt = math.acos(max(-1.0, min(1.0, r[2][2])))
+    pitch = math.atan2(-r[1][2], r[2][2])
+    yaw = math.asin(max(-1.0, min(1.0, r[0][2])))
+    roll = math.atan2(-r[0][1], r[0][0])
+    return math.degrees(tilt), math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
 
 
 class Series:
@@ -110,7 +127,7 @@ class Series:
 class Store:
     baro: Series = field(default_factory=lambda: Series(["altitude", "pressure", "temperature", "vz"]))
     imu: Series = field(default_factory=lambda: Series(
-        ["ax", "ay", "az", "amag", "gx", "gy", "gz", "tilt", "lean_x", "lean_y"]))
+        ["ax", "ay", "az", "amag", "gx", "gy", "gz", "tilt", "roll", "pitch", "yaw"]))
     fsm: dict | None = None                  # Último paquete de init bits (sobrevive a reinicios)
     apogee: tuple[float, float] | None = None  # (t, altitud)
     max_g: float | None = None
@@ -169,9 +186,9 @@ class Store:
             return
         ax, ay, az = accel
         amag = math.sqrt(ax * ax + ay * ay + az * az)
-        tilt, lean_x, lean_y = attitude(*quat)
+        tilt, roll, pitch, yaw = attitude(*quat)
         self.imu.append(t, ax=ax, ay=ay, az=az, amag=amag, gx=gyro[0], gy=gyro[1], gz=gyro[2],
-                        tilt=tilt, lean_x=lean_x, lean_y=lean_y)
+                        tilt=tilt, roll=roll, pitch=pitch, yaw=yaw)
         self.max_g = amag if self.max_g is None else max(self.max_g, amag)
         self._mark_new(now)
 

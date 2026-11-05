@@ -209,6 +209,14 @@ class LegendItem(QLabel):
                      f' <b style="color:{value}">{fmt(self.value, self.digits)}</b>')
 
 
+def break_wraps(t, y, limit: float = 180.0):
+    """Corta la línea donde un ángulo salta de +180 a -180 (o al revés) para no pintar un
+    trazo vertical falso. Devuelve (t, [y]) con un NaN en cada salto."""
+    y = np.asarray(y)
+    jumps = np.flatnonzero(np.abs(np.diff(y)) > limit) + 1
+    return np.insert(np.asarray(t, dtype=float), jumps, np.nan), [np.insert(y, jumps, np.nan)]
+
+
 class TimePlot(Panel):
     """Gráfica pequeña con el eje de tiempo compartido.
 
@@ -290,15 +298,6 @@ class TimePlot(Panel):
         else:
             self.plot.enableAutoRange(axis="x")
         self.plot.enableAutoRange(axis="y")
-
-
-class PlaceholderPanel(Panel):
-    """Hueco reservado para algo que aún no llega (el GPS)."""
-
-    def __init__(self, title: str, message: str):
-        super().__init__(title)
-        label = QLabel(message, objectName="muted", alignment=Qt.AlignCenter, wordWrap=True)
-        self.body.addWidget(label, 1)
 
 
 # ==================================================================

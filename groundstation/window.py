@@ -5,7 +5,7 @@ import time
 
 from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
 
 from backend.telemetry.models import BAROPacket, FSMPacket, IMUPacket, LogLevel
 from backend.telemetry.state import global_state
@@ -14,8 +14,8 @@ from .source import TelemetrySource
 from .store import Store
 from .theme import LOGOS, THEMES, stylesheet
 from .widgets import (
-    EventLog, InitBitsPanel, PlaceholderPanel, Segmented, StatCard, TimePlot, Zone, fmt, grid_of,
-    set_state, status_text,
+    EventLog, InitBitsPanel, Segmented, StatCard, TimePlot, Zone, fmt, grid_of,
+    break_wraps, set_state, status_text,
 )
 
 REFRESH_MS = 100  # Ritmo de refresco
@@ -103,17 +103,25 @@ class MainWindow(QMainWindow):
             "gyro": TimePlot("Velocidad angular", "°/s", [
                 ("X", "x", 0, DEFAULT_W, False), ("Y", "y", 0, DEFAULT_W, False),
                 ("Z", "z", 0, DEFAULT_W, False)], zero_line=True),
-            # Sin roll/pitch/yaw: con el eje del cohete vertical se acoplan (ver store.attitude).
-            # El giro sobre el eje del cohete se ve en la velocidad angular
+            # Pitch/yaw y roll por separado: el roll recorre ±180º y aplastaría la inclinación
             "attitude": TimePlot("Actitud", "°", [
-                ("Inclinación", "ink", 1, 1.5, False), ("Hacia X", "x", 1, DEFAULT_W, True),
-                ("Hacia Y", "y", 1, DEFAULT_W, True)], zero_line=True),
+                ("Inclinación", "ink", 1, 1.5, False), ("Pitch", "x", 1, DEFAULT_W, True),
+                ("Yaw", "y", 1, DEFAULT_W, True)], zero_line=True),
+            "roll": TimePlot("Roll", "°", [("Roll", "z", 0, DEFAULT_W, False)], zero_line=True),
         }
-        gps = PlaceholderPanel("Posición GPS", "Pendiente: el firmware aún no envía posición")
+        # Dos filas de tres: barómetro y aceleración arriba, giro y actitud abajo
         charts = Zone("Gráficas")
-        p = self.plots
-        charts.body.addLayout(grid_of([p["altitude"], p["vz"], gps, p["accel"], p["gyro"], p["attitude"]],
-                                      columns=3), 1)
+        grid = QGridLayout()
+        grid.setSpacing(6)
+        grid.setContentsMargins(0, 0, 0, 0)
+        layout_rows = [["altitude", "vz", "accel"], ["gyro", "attitude", "roll"]]
+        for row, keys in enumerate(layout_rows):
+            for col, key in enumerate(keys):
+                grid.addWidget(self.plots[key], row, col)
+            grid.setRowStretch(row, 1)
+        for col in range(3):
+            grid.setColumnStretch(col, 1)
+        charts.body.addLayout(grid, 1)
         main.addWidget(charts, 1)
         layout.addLayout(main, 1)
 
@@ -257,7 +265,8 @@ class MainWindow(QMainWindow):
         self.plots["vz"].set_data(bt, [b["vz"]], x_range)
         self.plots["accel"].set_data(it, [i["amag"], i["ax"], i["ay"], i["az"]], x_range)
         self.plots["gyro"].set_data(it, [i["gx"], i["gy"], i["gz"]], x_range)
-        self.plots["attitude"].set_data(it, [i["tilt"], i["lean_x"], i["lean_y"]], x_range)
+        self.plots["attitude"].set_data(it, [i["tilt"], i["pitch"], i["yaw"]], x_range)
+        self.plots["roll"].set_data(*break_wraps(it, i["roll"]), x_range)
 
         last_b = lambda k: s.baro.last(k)
         last_i = lambda k: s.imu.last(k)
