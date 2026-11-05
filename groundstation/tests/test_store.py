@@ -192,19 +192,21 @@ def test_ground_zeroes_altitude_and_forgets_apogee():
     assert s.set_ground()
     assert s.ground_alt == pytest.approx(101)
     assert s.apogee is None and s.max_g is None
+    assert len(s.baro) == 0 and len(s.imu) == 0  # Las gráficas empiezan de cero
     s.add_baro(5000, 151.0, 1, 1, now=5)
     assert s.altitude_agl(s.baro.last("altitude")) == pytest.approx(50)
     assert s.altitude_agl(s.apogee[1]) == pytest.approx(50)
 
 
-def test_clear_ground_restores_session_apogee():
+def test_clear_ground_goes_back_to_raw_altitude():
     s = Store()
-    s.add_baro(0, 135.0, 1, 1, now=0)
-    s.add_baro(1000, 100.0, 1, 1, now=1)
+    s.add_baro(0, 100.0, 1, 1, now=0)
     s.set_ground()
+    s.add_baro(1000, 130.0, 1, 1, now=1)
+    s.add_baro(2000, 110.0, 1, 1, now=2)
     s.clear_ground()
     assert s.ground_alt is None
-    assert s.apogee == (0.0, 135.0)
+    assert s.apogee == (1.0, 130.0)               # En bruto, con lo recibido desde la rampa
     assert s.altitude_agl(100.0) == 100.0
 
 

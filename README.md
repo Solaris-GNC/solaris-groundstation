@@ -110,9 +110,9 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
   Arrastrar con el ratón gira la vista; doble clic la devuelve a la inicial.
 - F11 pone a pantalla completa la ventana activa (la principal o la 3D); Esc la quita.
 - "Fijar rampa" (bloque Medidas): con el cohete en la rampa, la altitud actual (media de 2 s) pasa
-  a ser 0 y se borran el apogeo y la aceleración máxima acumulados en tierra, para que en vuelo no
-  arrastren la deriva del barómetro durante la espera. No toca la actitud. Los CSV guardan siempre
-  la altitud en bruto.
+  a ser 0 y las gráficas, el apogeo y la aceleración máxima empiezan de cero, para que en vuelo no
+  arrastren lo acumulado en tierra ni la deriva del barómetro durante la espera. No toca la
+  orientación de la vista 3D. Los CSV guardan siempre todo en bruto.
 - La fuente Oxanium va en `groundstation/assets/fonts` con su licencia (SIL OFL 1.1).
 
 ## Tests

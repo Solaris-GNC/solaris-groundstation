@@ -191,8 +191,8 @@ class MainWindow(QMainWindow):
             global_state.add_log("No se puede fijar la rampa: aún no hay datos del barómetro",
                                  LogLevel.WARNING)
             return
-        global_state.add_log(f"Rampa fijada a {fmt(self.store.ground_alt)} m: altitud y apogeo "
-                             "se miden desde aquí")
+        global_state.add_log(f"Rampa fijada a {fmt(self.store.ground_alt)} m: gráficas reiniciadas, "
+                             "altitud y apogeo se miden desde aquí")
         self._ground_changed()
 
     def clear_ground(self):

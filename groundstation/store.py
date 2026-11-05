@@ -313,11 +313,14 @@ class Store:
 
     def set_ground(self) -> bool:
         """Fija la rampa: la altitud actual (media de los últimos GROUND_AVG_S) pasa a ser 0 y se
-        olvidan el apogeo y la aceleración máxima acumulados en tierra. False si no hay barómetro."""
+        empiezan de cero las gráficas, el apogeo y la aceleración máxima: lo acumulado en tierra se
+        olvida. La orientación de la vista 3D se conserva. False si no hay barómetro."""
         if not len(self.baro):
             return False
         t, alt = self.baro.t, self.baro.cols["altitude"]
         self.ground_alt = float(np.mean(alt[t >= t[-1] - GROUND_AVG_S]))
+        self.baro = Series(self.baro.fields)
+        self.imu = Series(self.imu.fields)
         self.apogee = None
         self.max_g = None
         self.version += 1
@@ -325,7 +328,7 @@ class Store:
 
     def clear_ground(self):
         self.ground_alt = None
-        # El apogeo vuelve a contar toda la sesión
+        # El apogeo se recalcula en bruto con lo recibido desde que se fijó la rampa
         self.apogee = None
         if len(self.baro):
             k = int(np.argmax(self.baro.cols["altitude"]))

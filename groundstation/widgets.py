@@ -136,8 +136,8 @@ class GroundButtons(QWidget):
         layout.addWidget(self.status)
         self.set_button = QPushButton("Fijar rampa", objectName="topButton")
         self.set_button.setToolTip("Con el cohete en la rampa: la altitud actual (media de 2 s) pasa a\n"
-                                   "ser 0 y se borran el apogeo y la aceleración máxima acumulados en\n"
-                                   "tierra. Los CSV siguen guardando los datos en bruto")
+                                   "ser 0 y las gráficas, el apogeo y la aceleración máxima empiezan de\n"
+                                   "cero. Los CSV siguen guardando todo en bruto")
         self.clear_button = QPushButton("Quitar", objectName="topButton")
         self.clear_button.setToolTip("Vuelve a la altitud en bruto del barómetro")
         for button, signal in ((self.set_button, self.set_clicked), (self.clear_button, self.clear_clicked)):
