@@ -15,20 +15,29 @@ sin el dashboard web.
 
 ## Instalación
 
+Las dependencias se gestionan con [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`).
+uv descarga él solo la versión de Python de `.python-version` (3.13).
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r groundstation/requirements.txt
+sudo dnf install uv              # o: curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync                          # crea .venv con la app y las herramientas de desarrollo
 ```
+
+Los comandos de abajo se lanzan con `uv run` delante (`uv run python -m groundstation`), o
+activando antes el entorno con `source .venv/bin/activate`.
+
+- Añadir una dependencia: `uv add paquete` (desarrollo: `uv add --dev paquete`).
+- Actualizar versiones: `uv lock --upgrade` y `uv sync`.
+- `uv.lock` se sube al repo: así todos instalan exactamente las mismas versiones.
 
 ## Uso
 
 Desde la raíz del repo:
 
 ```bash
-python -m groundstation                     # busca el receptor solo
-python -m groundstation --port /dev/serial/by-id/usb-...
-python -m groundstation --replay logs/raw_uart_20261104_204244   # repite un log grabado
+uv run python -m groundstation                     # busca el receptor solo
+uv run python -m groundstation --port /dev/serial/by-id/usb-...
+uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite un log grabado
 ```
 
 - Sin `--port` se usa el primer puerto de `/dev/serial/by-id/`, y si no hay ninguno `/dev/ttyUSB*`
@@ -49,5 +58,8 @@ python -m groundstation --replay logs/raw_uart_20261104_204244   # repite un log
 ## Tests
 
 ```bash
-python -m pytest groundstation/tests backend/tests/comms
+uv run pytest
 ```
+
+Las rutas de los tests están en `pyproject.toml`. `backend/tests/telemetry` se deja fuera porque
+`test_decoder.py` está roto.

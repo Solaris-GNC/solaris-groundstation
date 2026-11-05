@@ -1,9 +1,9 @@
 """Estación de tierra de escritorio.
 
 Uso (desde la raíz del repo):
-    python -m groundstation                       # busca el receptor solo
-    python -m groundstation --port /dev/ttyUSB0
-    python -m groundstation --replay logs/raw_uart_20261104_204244   # repite un log grabado
+    uv run python -m groundstation                       # busca el receptor solo
+    uv run python -m groundstation --port /dev/ttyUSB0
+    uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite un log grabado
 """
 
 import argparse

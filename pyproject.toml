@@ -1,0 +1,30 @@
+[project]
+name = "solaris-groundstation"
+version = "0.1.0"
+description = "Estación de tierra de escritorio de Solaris (PySide6 + pyqtgraph)"
+readme = "README.md"
+requires-python = ">=3.11"
+# Lo que necesita la app (python -m groundstation): interfaz, puerto serie y decoder
+dependencies = [
+    "numpy>=1.26",
+    "pydantic>=2.0",
+    "pyqtgraph>=0.13",
+    "pyserial>=3.5",
+    "PySide6>=6.6",
+]
+
+[dependency-groups]
+# uv sync instala "dev" por defecto
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",  # backend/tests/comms/test_uart.py
+]
+
+[tool.uv]
+package = false   # Es una aplicación: no se construye ni se instala como paquete
+
+[tool.pytest.ini_options]
+# backend/tests importa "telemetry", "comms"... como paquetes de primer nivel
+pythonpath = [".", "backend"]
+# backend/tests/telemetry se deja fuera: test_decoder.py está roto
+testpaths = ["groundstation/tests", "backend/tests/comms"]
