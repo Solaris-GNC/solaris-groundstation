@@ -104,6 +104,9 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
   giróscopio integrado (`store.ViewOrientation`): el rumbo del DMP depende del magnetómetro y se
   desvía decenas de grados en segundos con la placa quieta. "Centrar vista", con el cohete en
   vertical y la cara de componentes de la placa hacia ti, orienta la vista desde donde estás.
+  En la rampa, "Rampa hacia [acimut] → Orientar" gira la vista para que la inclinación del cohete
+  apunte al acimut de la rampa: queda orientada al norte, con los puntos cardinales en el suelo
+  (la rampa tiene que estar inclinada al menos 3°).
   Arrastrar con el ratón gira la vista; doble clic la devuelve a la inicial.
 - F11 pone a pantalla completa la ventana activa (la principal o la 3D); Esc la quita.
 - "Fijar rampa" (bloque Medidas): con el cohete en la rampa, la altitud actual (media de 2 s) pasa

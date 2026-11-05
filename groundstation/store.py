@@ -17,6 +17,7 @@ RATE_WINDOW_S = 5.0        # Ventana para calcular muestras/s
 VZ_MAX_DT_S = 5.0          # Huecos mayores no se derivan (demasiados paquetes perdidos)
 VIEW_GYRO_DEADBAND_DPS = 1.0  # Vista 3D: giros más lentos se toman como ruido/sesgo del giróscopio
 VIEW_MAX_GYRO_DT_S = 1.0      # Vista 3D: con huecos mayores no se integra el giróscopio
+RAIL_MIN_TILT_DEG = 3.0       # Vista 3D: por debajo, no se distingue hacia dónde se inclina la rampa
 GROUND_AVG_S = 2.0         # Al fijar la rampa, la altitud de referencia es la media de estos segundos
 
 # Eje del sensor alineado con el eje longitudinal del cohete: el morro va por +Y de la placa
@@ -117,9 +118,14 @@ class ViewOrientation:
     rumbo solo cambia cuando el giróscopio mide giro, y girar el cohete sobre su eje se ve como
     tal. Los giros por debajo de VIEW_GYRO_DEADBAND_DPS se ignoran para que no derive en reposo.
 
-    El rumbo no tiene referencia absoluta: center() lo fija con la orientación actual (la cara
-    de la placa hacia la cámara). Se centra solo con la primera muestra.
+    El giróscopio solo da giros, no el rumbo absoluto. Se fija de una de dos formas:
+      - center(): la cara de la placa hacia la cámara (vista relativa a quien mira). Se centra
+        solo con la primera muestra.
+      - align_rail(acimut): con el cohete en la rampa inclinada, su lado bajo se gira hasta el
+        acimut de la rampa. Los ejes de la vista pasan a ser geográficos: X este, Y norte, Z arriba.
     `matrix`: cuerpo del cohete (columnas de rocket_matrix) -> ejes de la vista, Z arriba.
+    `rail_azimuth`: acimut de la rampa (grados desde el norte, sentido horario) si la vista está
+    orientada con align_rail; None si es relativa.
     """
 
     def __init__(self):
@@ -129,11 +135,39 @@ class ViewOrientation:
         self.matrix: np.ndarray | None = None
         self.t: float | None = None
         self.gyro: np.ndarray | None = None
+        self.rail_azimuth: float | None = None
 
     def center(self):
         if self.matrix is not None:
             # Fila 2: la vertical en ejes del cohete. Se deja solo la inclinación, rumbo 0
             self.matrix = align_up(self.matrix[2])
+            self.rail_azimuth = None
+
+    def align_rail(self, azimuth_deg: float) -> str | None:
+        """Orienta la vista al norte: el cohete está en la rampa, inclinado hacia azimuth_deg
+        (desde el norte, sentido horario). Devuelve un mensaje de error, o None si se ha orientado."""
+        if self.matrix is None:
+            return "aún no hay datos de la IMU"
+        nose = self.matrix[:, 2]
+        tilt = math.degrees(math.acos(max(-1.0, min(1.0, nose[2]))))
+        if tilt < RAIL_MIN_TILT_DEG:
+            return (f"el cohete está casi vertical ({tilt:.1f}°): con menos de {RAIL_MIN_TILT_DEG:.0f}° "
+                    "de inclinación no se sabe hacia dónde apunta la rampa")
+        # Giro alrededor de la vertical que lleva la dirección del morro al acimut (X este, Y norte)
+        current = math.atan2(nose[1], nose[0])
+        target = math.radians(90.0 - azimuth_deg)
+        d = target - current
+        rz = np.array([[math.cos(d), -math.sin(d), 0.0], [math.sin(d), math.cos(d), 0.0], [0.0, 0.0, 1.0]])
+        self.matrix = rz @ self.matrix
+        self.rail_azimuth = azimuth_deg % 360
+        return None
+
+    def nose_azimuth(self) -> float | None:
+        """Acimut del morro (grados desde el norte) si la vista está orientada; None si no."""
+        if self.matrix is None or self.rail_azimuth is None:
+            return None
+        nose = self.matrix[:, 2]
+        return (90.0 - math.degrees(math.atan2(nose[1], nose[0]))) % 360
 
     def update(self, t: float, r_dmp: np.ndarray, gyro_dps) -> None:
         """r_dmp: rocket_matrix() del DMP. gyro_dps: giróscopio en ejes de la placa (°/s)."""

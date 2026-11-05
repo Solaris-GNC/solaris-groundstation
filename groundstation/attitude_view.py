@@ -8,14 +8,14 @@ El cohete apunta por +Z de su cuerpo y se orienta con store.ViewOrientation: la 
 DMP y el rumbo del giróscopio integrado. El rumbo del DMP no se usa: depende del magnetómetro y se
 desvía decenas de grados en segundos con la placa quieta.
 
-El rumbo no tiene referencia absoluta. "Centrar vista" lo fija con la orientación actual: con el
-cohete en vertical y la cara de componentes de la placa hacia ti, a partir de ahí (con
-ROCKET_AXIS = "y"):
-  +X de la vista: hacia ti (la cámara mira desde aquí)
-  +Y de la vista: tu derecha
-  +Z de la vista: arriba
-Lo que inclinas hacia ti viene hacia la cámara y lo que inclinas a tu derecha va a la derecha,
-aunque antes hayas girado el cohete sobre su eje.
+El rumbo no tiene referencia absoluta. Se fija de dos formas:
+  - "Centrar vista": con el cohete en vertical y la cara de componentes de la placa hacia ti. La
+    vista queda relativa a ti (con ROCKET_AXIS = "y"): +X hacia ti (la cámara mira desde aquí),
+    +Y tu derecha, +Z arriba. Lo que inclinas hacia ti viene hacia la cámara, aunque antes hayas
+    girado el cohete sobre su eje.
+  - "Orientar", con el cohete en la rampa: se indica el acimut hacia el que está inclinada y la
+    vista se gira para que la inclinación del cohete apunte ahí. Queda orientada al norte (+X
+    este, +Y norte), con los puntos cardinales en el suelo y la cámara de lado a la rampa.
 """
 
 import math
@@ -23,7 +23,9 @@ import math
 import numpy as np
 from PySide6.QtCore import QLineF, QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QPushButton, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout, QLabel, QMainWindow, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget,
+)
 
 from .widgets import Panel, fmt, install_fullscreen_keys, toggle_fullscreen
 
@@ -35,6 +37,13 @@ VIEW_SIZE = 220.0          # Media altura visible, en unidades del modelo
 GRID_Z = -170.0            # Altura del suelo, justo por debajo de la cola del cohete
 GRID_CELL = 25.0
 GRID_EXTENT = 350.0        # La rejilla se desvanece hasta este radio
+COMPASS_RADIUS = 240.0     # Radio de las letras N/E/S/O sobre el suelo
+COMPASS = [("N", 0), ("NE", 45), ("E", 90), ("SE", 135), ("S", 180), ("SO", 225), ("O", 270), ("NO", 315)]
+
+
+def compass_name(azimuth: float) -> str:
+    """Punto cardinal más cercano (8 rumbos) de un acimut en grados desde el norte."""
+    return COMPASS[round(azimuth / 45) % 8][0]
 AXIS_LEN = 40.0
 RING_RES = 32              # Puntos por anillo
 SEGMENTS = 16              # Aristas longitudinales del cuerpo y la ojiva
@@ -104,6 +113,8 @@ class AttitudeView(QWidget):
         self.azimuth, self.elevation = DEFAULT_AZIMUTH, DEFAULT_ELEVATION
         self.angles: tuple[float, float, float, float] | None = None  # (tilt, roll, pitch, yaw)
         self.matrix: np.ndarray | None = None
+        self.rail_azimuth: float | None = None   # Vista orientada al norte (store.ViewOrientation)
+        self.nose_azimuth: float | None = None
         self.c: dict = {}
         self.family = ""
         self._drag_from: QPointF | None = None
@@ -112,13 +123,26 @@ class AttitudeView(QWidget):
         self.c, self.family = c, family
         self.update()
 
-    def set_attitude(self, tilt, roll, pitch, yaw, matrix: np.ndarray | None):
+    def set_attitude(self, tilt, roll, pitch, yaw, matrix: np.ndarray | None,
+                     rail_azimuth: float | None = None, nose_azimuth: float | None = None):
         """Ángulos en grados para la lectura y matriz cuerpo -> vista para el dibujo
-        (store.ViewOrientation.matrix). None si aún no hay datos de la IMU."""
+        (store.ViewOrientation.matrix). None si aún no hay datos de la IMU.
+        rail_azimuth: acimut de la rampa si la vista está orientada al norte (X este, Y norte)."""
         angles = None if pitch is None or matrix is None else (tilt, roll, pitch, yaw)
+        if rail_azimuth != self.rail_azimuth:
+            self.rail_azimuth = rail_azimuth
+            self.azimuth, self.elevation = self._default_camera()
         self.matrix = matrix
         self.angles = angles
+        self.nose_azimuth = nose_azimuth
         self.update()
+
+    def _default_camera(self) -> tuple[float, float]:
+        """Vista relativa: desde +X (quien mira la cara de la placa). Orientada al norte: de lado,
+        con la dirección de lanzamiento hacia la derecha de la pantalla, para ver la inclinación."""
+        if self.rail_azimuth is None:
+            return DEFAULT_AZIMUTH, DEFAULT_ELEVATION
+        return -self.rail_azimuth, DEFAULT_ELEVATION
 
     # ==================================================================
     # Cámara
@@ -148,7 +172,7 @@ class AttitudeView(QWidget):
         self.setCursor(Qt.OpenHandCursor)
 
     def mouseDoubleClickEvent(self, event):
-        self.azimuth, self.elevation = DEFAULT_AZIMUTH, DEFAULT_ELEVATION
+        self.azimuth, self.elevation = self._default_camera()
         self.update()
 
     # ==================================================================
@@ -178,7 +202,20 @@ class AttitudeView(QWidget):
             painter.setPen(QPen(grid_color, 1))
             painter.drawLine(QLineF(*p, *q))
 
-        # Ejes de la vista, sin nombre: X hacia ti, Y a tu derecha, Z arriba (colores de X/Y/Z)
+        # Puntos cardinales sobre el suelo, con la vista orientada al norte (X este, Y norte)
+        if self.rail_azimuth is not None:
+            font = QFont(self.family or self.font().family())
+            font.setPixelSize(13)
+            font.setBold(True)
+            painter.setFont(font)
+            for name, az in COMPASS:
+                a = math.radians(az)
+                p = project(np.array([math.sin(a), math.cos(a), 0.0]) * COMPASS_RADIUS + (0, 0, GRID_Z))
+                painter.setPen(QColor(c["text_strong"] if len(name) == 1 else c["muted"]))
+                painter.drawText(QPointF(p[0] - 5 * len(name), p[1] + 5), name)
+
+        # Ejes de la vista, sin nombre (colores de X/Y/Z). Relativa: X hacia ti, Y a tu derecha.
+        # Orientada al norte: X este, Y norte. Z siempre arriba
         origin = project(np.zeros(3))
         for axis, key in (((1, 0, 0), "x"), ((0, 1, 0), "y"), ((0, 0, 1), "z")):
             end = project(np.array(axis) * AXIS_LEN)
@@ -221,6 +258,12 @@ class AttitudeView(QWidget):
             painter.setPen(QColor(c["text_strong"]))
             painter.drawText(QPointF(x + 100, y + i * line), f"{fmt(value)}°")
         painter.setPen(QColor(c["muted"]))
+        if self.rail_azimuth is None:
+            note = "Vista relativa a quien mira (sin orientar al norte)"
+        else:
+            nose = f"{self.nose_azimuth:.0f}° {compass_name(self.nose_azimuth)}" if self.nose_azimuth is not None else "—"
+            note = f"Orientada con la rampa a {self.rail_azimuth:.0f}°: el morro apunta a {nose}"
+        painter.drawText(QPointF(x, y + len(rows) * line + 4), note)
         painter.drawText(QPointF(x, self.height() - 12), "Arrastrar: girar la vista · doble clic: volver · F11: pantalla completa")
 
 
@@ -230,7 +273,8 @@ class OrientationWindow(QMainWindow):
     La rellena la ventana principal (MainWindow._redraw) solo mientras está abierta.
     """
 
-    center_requested = Signal()  # "Centrar vista": la ventana principal centra store.view
+    center_requested = Signal()       # "Centrar vista": la ventana principal centra store.view
+    align_requested = Signal(float)   # "Orientar": acimut de la rampa, en grados desde el norte
 
     def __init__(self, parent: QWidget | None = None):
         # Con padre, Qt la cierra con la principal; Qt.Window la hace ventana independiente
@@ -245,6 +289,18 @@ class OrientationWindow(QMainWindow):
         self.setCentralWidget(root)
 
         view_panel = Panel("Actitud del cohete")
+        rail_label = QLabel("Rampa hacia", objectName="muted")
+        self.rail_azimuth = QSpinBox(minimum=0, maximum=359, suffix="°", wrapping=True)
+        self.rail_azimuth.setToolTip("Acimut hacia el que está inclinada la rampa, en grados desde el\n"
+                                     "norte en sentido horario (90° = este, 180° = sur)")
+        align = QPushButton("Orientar", objectName="topButton")
+        align.setToolTip("Con el cohete en la rampa: gira la vista para que su inclinación apunte al\n"
+                         "acimut de la rampa. Aparecen los puntos cardinales en el suelo")
+        align.clicked.connect(lambda: self.align_requested.emit(float(self.rail_azimuth.value())))
+        align.setCursor(Qt.PointingHandCursor)
+        for widget in (rail_label, self.rail_azimuth, align):
+            view_panel.head_layout.addWidget(widget)
+        view_panel.head_layout.addSpacing(12)
         center = QPushButton("Centrar vista", objectName="topButton")
         center.setToolTip("Con el cohete en vertical y la cara de componentes de la placa hacia ti:\n"
                           "la vista se orienta desde donde estás tú. Solo afecta a esta vista")
@@ -267,4 +323,5 @@ class OrientationWindow(QMainWindow):
     def set_attitude(self, store):
         """Última muestra de la IMU y orientación de la vista (store.view)."""
         last = store.imu.last
-        self.view.set_attitude(last("tilt"), last("roll"), last("pitch"), last("yaw"), store.view.matrix)
+        self.view.set_attitude(last("tilt"), last("roll"), last("pitch"), last("yaw"), store.view.matrix,
+                               store.view.rail_azimuth, store.view.nose_azimuth())

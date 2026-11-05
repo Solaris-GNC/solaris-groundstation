@@ -80,6 +80,8 @@ def stylesheet(c: dict, family: str) -> str:
     #topButton {{ background: transparent; color: {c['muted']}; border: 1px solid {c['border_strong']};
                   border-radius: 2px; padding: 5px 11px; }}
     #topButton:hover {{ color: {c['text_strong']}; }}
+    QSpinBox {{ background: {c['panel_2']}; color: {c['text_strong']}; border: 1px solid {c['border_strong']};
+                border-radius: 2px; padding: 3px 4px; selection-background-color: {c['x']}; }}
     #segmented QPushButton:checked {{ background: {c['panel_2']}; color: {c['text_strong']};
                                       font-weight: 600; }}
 

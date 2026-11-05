@@ -48,6 +48,8 @@ class MainWindow(QMainWindow):
         self.resize(1440, 900)
         self.orientation = OrientationWindow(self)
         self.orientation.center_requested.connect(self.center_view)
+        self.orientation.align_requested.connect(self.align_view)
+        self.orientation.rail_azimuth.setValue(int(self.settings.value("rail_azimuth", 0)))
         install_fullscreen_keys(self)
         self._build()
         self.apply_theme(self.theme)
@@ -205,6 +207,16 @@ class MainWindow(QMainWindow):
     def center_view(self):
         self.store.view.center()
         self.store.version += 1  # Repinta aunque no lleguen datos
+        self.next_redraw_at = 0.0
+
+    def align_view(self, azimuth: float):
+        self.settings.setValue("rail_azimuth", int(azimuth))
+        error = self.store.view.align_rail(azimuth)
+        if error:
+            global_state.add_log(f"No se puede orientar la vista 3D: {error}", LogLevel.WARNING)
+            return
+        global_state.add_log(f"Vista 3D orientada al norte con la rampa a {azimuth:.0f}°")
+        self.store.version += 1
         self.next_redraw_at = 0.0
 
     def open_orientation(self):

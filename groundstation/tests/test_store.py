@@ -115,6 +115,31 @@ def test_view_does_not_drift_at_rest():
     assert nose == pytest.approx([0.5, 0, math.cos(math.radians(30))], abs=1e-6)
 
 
+def test_align_rail_points_the_tilt_to_the_rail_azimuth():
+    # Rampa inclinada 8º; tras orientar a 120º el morro apunta a 120º, también al girar el cohete
+    # sobre su eje (el giróscopio lo mide) y aunque el DMP desvíe su rumbo
+    s = Store()
+    q = quat_mul(axis_angle((0, 0, 1), 70), axis_angle((1, 0, 0), 8))
+    s.add_imu(0, (0, 0, 1), (0, 0, 90.0), q, now=0)   # Ya girando a ritmo constante
+    assert s.view.align_rail(120) is None
+    assert s.view.rail_azimuth == 120
+    assert s.view.nose_azimuth() == pytest.approx(120)
+    for k in range(1, 11):                       # 90º de giro sobre el eje del cohete
+        q = quat_mul(q, axis_angle((0, 0, 1), 9))
+        s.add_imu(k * 100, (0, 0, 1), (0, 0, 90.0), quat_mul(axis_angle((0, 0, 1), 5 * k), q), now=k / 10)
+    assert s.view.nose_azimuth() == pytest.approx(120, abs=0.5)
+    s.view.center()
+    assert s.view.rail_azimuth is None and s.view.nose_azimuth() is None
+
+
+def test_align_rail_needs_a_tilted_rocket():
+    s = Store()
+    assert s.view.align_rail(90) is not None     # Sin datos
+    add_imu(s, 0, quat=axis_angle((1, 0, 0), 1))
+    assert "vertical" in s.view.align_rail(90)
+    assert s.view.rail_azimuth is None
+
+
 # ==================================================================
 # Store
 
