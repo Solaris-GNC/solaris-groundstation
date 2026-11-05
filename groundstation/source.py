@@ -76,6 +76,7 @@ class TelemetrySource(threading.Thread):
         buffer = PacketBuffer()
         framer = SPPFramer()
         decoder = Decoder()
+        connections = getattr(self.reader, "connections", 0)
 
         # En repetición no se pasa por el router: volvería a escribir en logs/ datos que ya están
         router = raw_logger = None
@@ -88,6 +89,10 @@ class TelemetrySource(threading.Thread):
             # pantalla se quedaría congelada sin avisar (pasaba con el backend web)
             try:
                 data = self.reader.read()
+                # Tras reconectar, lo que quedara de la conexión anterior es media trama: fuera
+                if getattr(self.reader, "connections", 0) != connections:
+                    connections = self.reader.connections
+                    buffer.clear()
                 if data:
                     buffer.write(data)
                 while (frame := framer.extract(buffer)) is not None:
@@ -106,5 +111,7 @@ class TelemetrySource(threading.Thread):
 
         if raw_logger:
             from backend.recording.telemetry_logger import telemetry_logger
+            if hasattr(self.reader, "close"):
+                self.reader.close()
             raw_logger.close()
             telemetry_logger.close()

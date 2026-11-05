@@ -29,6 +29,7 @@ class UART:
         self.reconnect_delay = reconnect_delay
         self._ser = None                                                        # Es el parametro donde guardaremos el objeto Serial
         self.connected_port: str | None = None                                  # Puerto abierto ahora mismo (None = desconectado)
+        self.connections = 0                                                    # Sube en cada conexión: el lector vacía su buffer
 
     @property
     def connected(self) -> bool:
@@ -44,11 +45,14 @@ class UART:
             time.sleep(self.reconnect_delay)
             return False
         try:
-            self._ser = serial.Serial(port, self.baud_rate, timeout=self.timeout)
+            # exclusive: si otro programa (u otra instancia de la app) ya tiene el puerto abierto,
+            # falla aquí en vez de repartirse los bytes entre los dos y corromper las tramas
+            self._ser = serial.Serial(port, self.baud_rate, timeout=self.timeout, exclusive=True)
             self.connected_port = port
+            self.connections += 1
             logger.info(f"UART conectado: {port} @ {self.baud_rate} baud")
             return True
-        except (serial.SerialException, OSError) as e:
+        except (serial.SerialException, OSError, ValueError) as e:                 # ValueError: parámetros no válidos
             logger.warning(f"No se pudo abrir {port} ({e}). "
                            f"Reintentando en {self.reconnect_delay}s…")
             time.sleep(self.reconnect_delay)                                    # Critico!
