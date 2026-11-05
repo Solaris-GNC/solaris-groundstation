@@ -39,7 +39,8 @@ class TelemetryLogger:
             self._fsm_path: FSM_FIELDS,
             self._events_path: EVENTS_FIELDS,
         }
-        self._handles: dict = {}     
+        self._handles: dict = {}
+        self._failed: set = set()       # Ficheros que no se pueden escribir: se avisa una vez y se ignoran
 
 # ==================================================================
     def log_baro(self, packet: TelemetryPacket):
@@ -99,12 +100,16 @@ class TelemetryLogger:
         return handle
 
     def _write_row(self, path: str, fields: list, row: dict) -> None:
+        # Nunca lanza: un fallo de disco no puede tirar la telemetría en pantalla
+        if path in self._failed:
+            return
         try:
             handle = self._get_handle(path)
             datos_texto = [str(row.get(campo, 0.0)) for campo in fields]
             handle.write(",".join(datos_texto) + "\n")
         except Exception as e:
-            logger.error(f"Error crítico escribiendo en {path}: {e}")
+            self._failed.add(path)
+            logger.error(f"No se puede escribir {path} ({e}): se deja de guardar ese CSV")
 
     def close(self):
         # Cierre ordenado de todos los ficheros (llamar en el shutdown de la app)

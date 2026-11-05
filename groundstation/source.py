@@ -17,12 +17,42 @@ from backend.telemetry.decoder import Decoder
 
 logger = logging.getLogger(__name__)
 
+DISCARD_REPORT_S = 10.0   # Los paquetes descartados se resumen en un aviso cada tantos segundos
+
+
+class DiscardReport:
+    """Avisa del primer paquete descartado y resume el resto cada DISCARD_REPORT_S: si el firmware
+    manda algo que no entendemos de forma continua, no se llena la consola de avisos."""
+
+    def __init__(self):
+        self.count = 0
+        self.last_reason = ""
+        self.next_report = 0.0
+
+    def add(self, reason: str):
+        now = time.monotonic()
+        self.count += 1
+        self.last_reason = reason
+        if now >= self.next_report:
+            extra = f" (y {self.count - 1} más en los últimos {DISCARD_REPORT_S:.0f} s)" if self.count > 1 else ""
+            logger.warning(f"Paquete descartado: {reason}{extra}")
+            self.count = 0
+            self.next_report = now + DISCARD_REPORT_S
+
 
 class ReplayReader:
     """Reproduce un raw_uart_* de logs/ (una trama en hexadecimal por línea) a un ritmo fijo."""
 
     def __init__(self, path: Path, fps: float, loop: bool = True):
-        self.frames = [bytes.fromhex(line) for line in path.read_text().splitlines() if line.strip()]
+        self.frames = []
+        for line in path.read_text(errors="replace").splitlines():
+            try:
+                if line.strip():
+                    self.frames.append(bytes.fromhex(line))
+            except ValueError:
+                pass                     # Línea dañada (log cortado, editado a mano): se salta
+        if not self.frames:
+            raise ValueError(f"{path} no tiene ninguna trama")
         self.period = 1 / fps
         self.loop = loop
         self.index = 0
@@ -72,10 +102,38 @@ class TelemetrySource(threading.Thread):
         if self.is_alive() and threading.current_thread() is not self:
             self.join(timeout=2.0)
 
+    def _handle_frame(self, frame, decoder, router, raw_logger, discards):
+        """Una trama con CRC válido: log en bruto, decodificar, pantalla, CSV. Cada paso por
+        separado, para que un fallo al guardar no impida ver el paquete (ni al revés)."""
+        if raw_logger:
+            try:
+                raw_logger.log_frame(frame)     # Antes de decodificar: queda aunque no se entienda
+            except Exception:
+                logger.exception("Error en el log en bruto")
+        try:
+            packet = decoder.frame_to_packet(frame)
+        except Exception as e:
+            if hasattr(e, "errors"):            # pydantic: qué campo y por qué (p. ej. quat_w NaN)
+                err = e.errors()[0]
+                reason = f"{e.title}.{'.'.join(map(str, err['loc']))}: {err['msg']}"
+            else:
+                reason = str(e).splitlines()[0]
+            discards.add(reason)
+            return
+        is_new = True
+        if router:
+            try:
+                is_new = router.route_packet(packet)
+            except Exception:
+                logger.exception("Error guardando el paquete o comprobando el enlace")
+        if is_new:
+            self.packets.put(packet)
+
     def run(self):
         buffer = PacketBuffer()
         framer = SPPFramer()
         decoder = Decoder()
+        discards = DiscardReport()
         connections = getattr(self.reader, "connections", 0)
 
         # En repetición no se pasa por el router: volvería a escribir en logs/ datos que ya están
@@ -96,15 +154,7 @@ class TelemetrySource(threading.Thread):
                 if data:
                     buffer.write(data)
                 while (frame := framer.extract(buffer)) is not None:
-                    try:
-                        if raw_logger:
-                            raw_logger.log_frame(frame)
-                        packet = decoder.frame_to_packet(frame)
-                        if router:
-                            router.route_packet(packet)
-                        self.packets.put(packet)
-                    except Exception as e:
-                        logger.warning(f"Paquete descartado: {e}")
+                    self._handle_frame(frame, decoder, router, raw_logger, discards)
             except Exception:
                 logger.exception("Error inesperado en el hilo de lectura; se sigue leyendo")
                 time.sleep(0.5)

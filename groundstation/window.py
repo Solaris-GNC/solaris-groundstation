@@ -1,5 +1,6 @@
 """Ventana principal: cabecera, medidas, estado y gráficas."""
 
+import logging
 import queue
 import time
 
@@ -20,6 +21,8 @@ from .widgets import (
     EventLog, GroundButtons, InitBitsPanel, Segmented, StatCard, TimePlot, Zone, break_wraps, fmt,
     grid_of, install_fullscreen_keys, set_state, status_text,
 )
+
+logger = logging.getLogger(__name__)
 
 REFRESH_MS = 100  # Ritmo de refresco
 # Si repintar las gráficas tarda, se espera proporcionalmente antes del siguiente repintado:
@@ -267,16 +270,23 @@ class MainWindow(QMainWindow):
                 packet = self.source.packets.get_nowait()
             except queue.Empty:
                 return
-            ts = packet.secondary_header.timestamp_ms
-            p = packet.payload
-            if isinstance(p, BAROPacket):
-                self.store.add_baro(ts, p.altitude, p.pressure, p.temperature)
-            elif isinstance(p, IMUPacket):
-                self.store.add_imu(ts, (p.accel_x, p.accel_y, p.accel_z), (p.gyro_x, p.gyro_y, p.gyro_z),
-                                   (p.quat_w, p.quat_x, p.quat_y, p.quat_z))
-            elif isinstance(p, FSMPacket):
-                self.store.set_fsm(ts, p.fsm_errors, p.common_errors, p.failed)
-                self.init_bits.set_fsm(self.store.fsm)
+            # Un paquete que falle no frena a los demás ni el refresco de la pantalla
+            try:
+                self._add_packet(packet)
+            except Exception:
+                logger.exception("Paquete no procesado en la interfaz")
+
+    def _add_packet(self, packet):
+        ts = packet.secondary_header.timestamp_ms
+        p = packet.payload
+        if isinstance(p, BAROPacket):
+            self.store.add_baro(ts, p.altitude, p.pressure, p.temperature)
+        elif isinstance(p, IMUPacket):
+            self.store.add_imu(ts, (p.accel_x, p.accel_y, p.accel_z), (p.gyro_x, p.gyro_y, p.gyro_z),
+                               (p.quat_w, p.quat_x, p.quat_y, p.quat_z))
+        elif isinstance(p, FSMPacket):
+            self.store.set_fsm(ts, p.fsm_errors, p.common_errors, p.failed)
+            self.init_bits.set_fsm(self.store.fsm)
 
     def _update_receiver(self):
         connected = self.source.connected
