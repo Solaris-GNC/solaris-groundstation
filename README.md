@@ -11,7 +11,7 @@ sin el dashboard web.
 
 - `groundstation/`: la app (PySide6 + pyqtgraph).
 - `backend/`: lectura del puerto serie, tramas SPP, decoder y CSV en `logs/` (raw_uart, baro, imu,
-  fsm, eventos). Conserva el servidor FastAPI (`backend/main.py`), que la app no necesita.
+  fsm, eventos).
 
 ## Instalación
 

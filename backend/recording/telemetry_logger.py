@@ -78,30 +78,6 @@ class TelemetryLogger:
         }
         self._write_row(self._fsm_path, FSM_FIELDS, row)
 
-    # def log_imu1(self, packet: TelemetryPacket):
-    #     payload: IMUPacket1 = packet.payload
-    #     row = {
-    #         "timestamp_ms": packet.secondary_header.timestamp_ms,
-    #         "seq": packet.primary_header.seq,
-    #         "drop_counter": packet.secondary_header.drop_counter,
-    #         "accel_x": payload.accel_x, "accel_y": payload.accel_y, "accel_z": payload.accel_z,
-    #         "gyro_x": payload.gyro_x,  "gyro_y":  payload.gyro_y,  "gyro_z":  payload.gyro_z,
-    #         "mag_x": payload.mag_x, "mag_y": payload.mag_y, "mag_z": payload.mag_z,
-    #         "quat_w": payload.quat_w, "quat_x": payload.quat_x, "quat_y": payload.quat_y,
-    #     }
-    #     self._write_row(self._imu_path, IMU_FIELDS, row)
-
-    # def log_imu2(self, packet: TelemetryPacket):
-    #     payload: IMUPacket2 = packet.payload
-    #     row = {
-    #         "timestamp_ms": packet.secondary_header.timestamp_ms,
-    #         "seq": packet.primary_header.seq,
-    #         "drop_counter": packet.secondary_header.drop_counter,
-    #         "quat_z": payload.quat_z,
-    #         "accuracy": payload.accuracy,
-    #     }
-    #     self._write_row(self._imu_path, IMU_FIELDS, row)
-
     def log_event(self, level, message: str, timestamp_ms: float = None):
         row = {
             "timestamp_ms": timestamp_ms,
@@ -129,9 +105,6 @@ class TelemetryLogger:
             handle.write(",".join(datos_texto) + "\n")
         except Exception as e:
             logger.error(f"Error crítico escribiendo en {path}: {e}")
-
-    def _now(self) -> str:
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
     def close(self):
         # Cierre ordenado de todos los ficheros (llamar en el shutdown de la app)

@@ -79,9 +79,6 @@ class Series:
     def cols(self) -> dict[str, np.ndarray]:
         return {f: self._data[i + 1, :self._n] for i, f in enumerate(self.fields)}
 
-    def col(self, name: str, start: int = 0) -> np.ndarray:
-        return self._data[self.fields.index(name) + 1, start:self._n]
-
     def append(self, t: float, **values: float):
         if self._n == self._data.shape[1]:
             if self._n < MAX_SAMPLES:

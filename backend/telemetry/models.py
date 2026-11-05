@@ -55,27 +55,6 @@ class BAROPacket(BaseModel):
     temperature: float = Field(...)   # ºC
 
 # ==================================================================
-# # IMU fragmento 1 (payload_len 48 = 12 floats)
-# #TODO: asignar rangos de validación según datasheet
-# class IMUPacket1(BaseModel):
-#     accel_x: float = Field(...)   # G
-#     accel_y: float = Field(...)
-#     accel_z: float = Field(...)
-#     gyro_x: float = Field(...)    # dps
-#     gyro_y: float = Field(...)
-#     gyro_z: float = Field(...)
-#     mag_x: float = Field(...)     # uT
-#     mag_y: float = Field(...)
-#     mag_z: float = Field(...)
-#     quat_w: float = Field(...)    # el cuaternión va partido entre los dos fragmentos
-#     quat_x: float = Field(...)
-#     quat_y: float = Field(...)
-
-# # IMU fragmento 2 (payload_len 12 = 3 floats; los 2 últimos son reservados/padding)
-# class IMUPacket2(BaseModel):
-#     quat_z: float = Field(...)
-#     accuracy: float = Field(...)
-
 class IMUPacket(BaseModel):
     accel_x: float = Field(...)   # G
     accel_y: float = Field(...)
@@ -83,7 +62,7 @@ class IMUPacket(BaseModel):
     gyro_x: float = Field(...)    # dps
     gyro_y: float = Field(...)
     gyro_z: float = Field(...)
-    quat_w: float = Field(...)    # el cuaternión va partido entre los dos fragmentos
+    quat_w: float = Field(...)
     quat_x: float = Field(...)
     quat_y: float = Field(...)
     quat_z: float = Field(...)

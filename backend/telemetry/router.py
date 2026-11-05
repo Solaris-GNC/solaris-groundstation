@@ -12,13 +12,8 @@ logger = logging.getLogger(__name__)
 
 class TelemetryRouter:
     def __init__(self):
-        # Último paquete recibido (seq global + su timestamp y crc, para detectar duplicados)
-        self.last_seq: int | None = None
-        self.last_ts: int | None = None
-        self.last_crc: int | None = None
-        self.apid: int | None = None
-
-        self.last_packets:dict = {}
+        # Último paquete de cada APID (seq, timestamp y crc), para detectar pérdidas y duplicados
+        self.last_packets: dict = {}
 
     def route_packet(self, packet: TelemetryPacket):
         apid = packet.primary_header.apid
@@ -37,19 +32,12 @@ class TelemetryRouter:
             self.handle_baro(packet)
         elif isinstance(packet.payload, IMUPacket):
             self.handle_imu(packet)
-        #     # Los dos fragmentos comparten APID; el decoder ya distinguió el tipo
-        #     if isinstance(packet.payload, IMUPacket):
-        #         self.handle_imu(packet)
-        # else:
-        #     msg = f"APID desconocido recibido: {hex(apid)}. Paquete descartado"
-        #     self._log(msg, level=LogLevel.WARNING)
 
 # ==================================================================
 # Funciones de cada sensor:
     def handle_fsm(self, packet: TelemetryPacket):
         payload: FSMPacket = packet.payload
         ts = packet.secondary_header.timestamp_ms
-        global_state.update_fsm(payload, ts)
         telemetry_logger.log_fsm(packet)
 
         bits = f"fsm=0x{payload.fsm_errors:04X} common=0x{payload.common_errors:04X}"
@@ -61,35 +49,12 @@ class TelemetryRouter:
                       level=LogLevel.INFO, timestamp_ms=ts)
 
     def handle_baro(self, packet: TelemetryPacket):
-        global_state.update_baro(packet.payload, packet.secondary_header.timestamp_ms)
-        print("LOG BARO")
         telemetry_logger.log_baro(packet)
         logger.debug(f"BARO actualizado (Seq: {packet.primary_header.seq})")
 
     def handle_imu(self, packet: TelemetryPacket):
-        global_state.update_imu(
-            packet.payload,
-            packet.secondary_header.timestamp_ms,
-        )
-        print("LOG IMU")
         telemetry_logger.log_imu(packet)
         logger.debug(f"IMU actualizado (Seq: {packet.primary_header.seq})")
-        
-    # def handle_imu1(self, packet: TelemetryPacket):
-    #     global_state.update_imu1(
-    #         packet.payload,
-    #         packet.secondary_header.timestamp_ms,
-    #     )
-    #     telemetry_logger.log_imu1(packet)
-    #     logger.debug(f"IMU1 actualizado (Seq: {packet.primary_header.seq})")
-
-
-
-    # def handle_imu2(self, packet: TelemetryPacket):
-    #     global_state.update_imu2(packet.payload)
-    #     print("LOG IMU2")
-    #     telemetry_logger.log_imu2(packet)
-    #     logger.debug(f"IMU2 actualizado (Seq: {packet.primary_header.seq})")
 
 # ==================================================================
 # Comprobación de paquetes perdidos:

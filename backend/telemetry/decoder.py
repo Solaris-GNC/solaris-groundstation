@@ -69,21 +69,4 @@ class Decoder():
             gyro_x=gx, gyro_y=gy, gyro_z=gz,
             quat_w=qw, quat_x=qx, quat_y=qy,
             quat_z=qz, accuracy=acc,
-        ) 
-
-    # def imu1_payload_decoder(self):
-    #     # 12 floats: accel xyz, gyro xyz, mag xyz, quat_w, quat_x, quat_y
-    #     (ax, ay, az, gx, gy, gz, mx, my, mz,
-    #      qw, qx, qy) = struct.unpack("<12f", self.payload_bytes[:48])
-    #     return IMUPacket1(
-    #         accel_x=ax, accel_y=ay, accel_z=az,
-    #         gyro_x=gx, gyro_y=gy, gyro_z=gz,
-    #         mag_x=mx, mag_y=my, mag_z=mz,
-    #         quat_w=qw, quat_x=qx, quat_y=qy,
-    #     )
-
-    # def imu2_payload_decoder(self):
-    #     # 4 floats: quat_z, accuracy
-    #     qz, accuracy = struct.unpack("<2f", self.payload_bytes[:8])
-    #     return IMUPacket2(quat_z=qz, accuracy=accuracy)
-
+        )

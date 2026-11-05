@@ -22,7 +22,7 @@ THEMES = {
         "border": "#cbc9c1", "border_strong": "#b5b3aa",
         "text": "#2b2a27", "text_strong": "#0b0b0b", "muted": "#6f6e69",
         "ok": "#1d7a1d", "ok_bg": "#e9f3e6", "fail": "#c42b35", "fail_bg": "#fbeceb",
-        "warn": "#9a6200", "warn_bg": "#fbf1dc",
+        "warn": "#9a6200",
         # Gráficas
         "x": "#2a78d6", "y": "#eb6834", "z": "#1baf7a", "ink": "#2b2a27",
         "chart_muted": "#898781", "grid": "#e8e7e1", "axis": "#c3c2b7",
@@ -33,7 +33,7 @@ THEMES = {
         "border": "#353531", "border_strong": "#4a4a45",
         "text": "#d6d5cf", "text_strong": "#f0efec", "muted": "#9a9993",
         "ok": "#4cb84c", "ok_bg": "#1d2a1c", "fail": "#e86464", "fail_bg": "#2f1e1d",
-        "warn": "#e0a43a", "warn_bg": "#2e2617",
+        "warn": "#e0a43a",
         "x": "#3987e5", "y": "#d95926", "z": "#199e70", "ink": "#e6e5e0",
         "chart_muted": "#898781", "grid": "#2c2c2a", "axis": "#383835",
     },
