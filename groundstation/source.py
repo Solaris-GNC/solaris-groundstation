@@ -67,7 +67,10 @@ class TelemetrySource(threading.Thread):
         return self.reader.connected_port
 
     def stop(self):
+        """Para el hilo y espera a que cierre los ficheros de logs/."""
         self._stop_event.set()
+        if self.is_alive() and threading.current_thread() is not self:
+            self.join(timeout=2.0)
 
     def run(self):
         buffer = PacketBuffer()
@@ -100,3 +103,8 @@ class TelemetrySource(threading.Thread):
             except Exception:
                 logger.exception("Error inesperado en el hilo de lectura; se sigue leyendo")
                 time.sleep(0.5)
+
+        if raw_logger:
+            from backend.recording.telemetry_logger import telemetry_logger
+            raw_logger.close()
+            telemetry_logger.close()
