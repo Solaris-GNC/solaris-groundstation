@@ -117,6 +117,36 @@ def test_no_vertical_speed_across_long_gaps():
     assert math.isnan(s.baro.cols["vz"][1])
 
 
+def test_ground_zeroes_altitude_and_forgets_apogee():
+    s = Store()
+    s.add_baro(0, 120.0, 1, 1, now=0)
+    s.add_baro(1000, 135.0, 1, 1, now=1)        # Pico al moverlo en tierra
+    s.add_baro(3000, 100.0, 1, 1, now=3)
+    s.add_baro(4000, 102.0, 1, 1, now=4)        # Media de los últimos 2 s: 101
+    s.max_g = 3.0
+    assert s.set_ground()
+    assert s.ground_alt == pytest.approx(101)
+    assert s.apogee is None and s.max_g is None
+    s.add_baro(5000, 151.0, 1, 1, now=5)
+    assert s.altitude_agl(s.baro.last("altitude")) == pytest.approx(50)
+    assert s.altitude_agl(s.apogee[1]) == pytest.approx(50)
+
+
+def test_clear_ground_restores_session_apogee():
+    s = Store()
+    s.add_baro(0, 135.0, 1, 1, now=0)
+    s.add_baro(1000, 100.0, 1, 1, now=1)
+    s.set_ground()
+    s.clear_ground()
+    assert s.ground_alt is None
+    assert s.apogee == (0.0, 135.0)
+    assert s.altitude_agl(100.0) == 100.0
+
+
+def test_ground_needs_baro():
+    assert not Store().set_ground()
+
+
 def test_stale_and_rate():
     s = Store()
     assert s.is_stale(now=0)

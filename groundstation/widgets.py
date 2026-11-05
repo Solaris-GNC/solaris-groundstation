@@ -43,7 +43,8 @@ def status_text(text: str) -> str:
 
 
 class Zone(QFrame):
-    """Bloque: agrupa paneles relacionados con un fondo y un título propios."""
+    """Bloque: agrupa paneles relacionados con un fondo y un título propios.
+    En `self.head_layout` caben controles a la derecha del título."""
 
     def __init__(self, title: str):
         super().__init__(objectName="zone")
@@ -54,7 +55,12 @@ class Zone(QFrame):
         font = label.font()
         font.setLetterSpacing(QFont.AbsoluteSpacing, 1.5)
         label.setFont(font)
-        self.body.addWidget(label)
+        # Fila del título: en `self.head_layout` caben controles a la derecha
+        self.head_layout = QHBoxLayout()
+        self.head_layout.setContentsMargins(0, 0, 0, 0)
+        self.head_layout.addWidget(label)
+        self.head_layout.addStretch(1)
+        self.body.addLayout(self.head_layout)
 
 
 class Panel(QFrame):
@@ -100,6 +106,40 @@ class Segmented(QFrame):
             button.clicked.connect(lambda _=False, v=value: self.changed.emit(v))
             self.group.addButton(button)
             layout.addWidget(button)
+
+
+class GroundButtons(QWidget):
+    """"Fijar rampa" pone a cero la altitud con el cohete en la rampa, para que en vuelo la altitud
+    y el apogeo no arrastren la deriva del barómetro durante la espera. "Quitar" solo aparece con
+    la rampa fijada. La actitud no se toca."""
+
+    set_clicked = Signal()
+    clear_clicked = Signal()
+
+    def __init__(self):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self.status = QLabel("", objectName="muted")
+        layout.addWidget(self.status)
+        self.set_button = QPushButton("Fijar rampa", objectName="topButton")
+        self.set_button.setToolTip("Con el cohete en la rampa: la altitud actual (media de 2 s) pasa a\n"
+                                   "ser 0 y se borran el apogeo y la aceleración máxima acumulados en\n"
+                                   "tierra. Los CSV siguen guardando los datos en bruto")
+        self.clear_button = QPushButton("Quitar", objectName="topButton")
+        self.clear_button.setToolTip("Vuelve a la altitud en bruto del barómetro")
+        for button, signal in ((self.set_button, self.set_clicked), (self.clear_button, self.clear_clicked)):
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(signal.emit)
+            layout.addWidget(button)
+        self.set_ground(None)
+
+    def set_ground(self, ground_alt: float | None):
+        active = ground_alt is not None
+        self.clear_button.setVisible(active)
+        self.set_button.setText("Fijar de nuevo" if active else "Fijar rampa")
+        self.status.setText(f"Rampa a {fmt(ground_alt)} m" if active else "Altitud en bruto")
 
 
 # ==================================================================

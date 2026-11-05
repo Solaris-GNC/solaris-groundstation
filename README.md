@@ -52,6 +52,10 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
 - Llega cada paquete a la pantalla, sin pasar por un servidor.
 - Las gráficas reciben solo la ventana visible y se repintan solo con datos nuevos. Si repintar
   tarda (sesiones muy largas en "Todo"), se repinta menos a menudo en vez de congelarse.
+- "Fijar rampa" (bloque Medidas): con el cohete en la rampa, la altitud actual (media de 2 s) pasa
+  a ser 0 y se borran el apogeo y la aceleración máxima acumulados en tierra, para que en vuelo no
+  arrastren la deriva del barómetro durante la espera. No toca la actitud. Los CSV guardan siempre
+  la altitud en bruto.
 - La fuente Oxanium va en `groundstation/assets/fonts` con su licencia (SIL OFL 1.1).
 
 ## Tests

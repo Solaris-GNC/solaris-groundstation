@@ -14,8 +14,8 @@ from .source import TelemetrySource
 from .store import Store
 from .theme import LOGOS, THEMES, stylesheet
 from .widgets import (
-    EventLog, InitBitsPanel, Segmented, StatCard, TimePlot, Zone, fmt, grid_of,
-    break_wraps, set_state, status_text,
+    EventLog, GroundButtons, InitBitsPanel, Segmented, StatCard, TimePlot, Zone, break_wraps, fmt,
+    grid_of, set_state, status_text,
 )
 
 REFRESH_MS = 100  # Ritmo de refresco
@@ -73,6 +73,10 @@ class MainWindow(QMainWindow):
             "link": StatCard("Enlace", "muestras/s"),
         }
         stats_zone = Zone("Medidas")
+        self.ground = GroundButtons()
+        self.ground.set_clicked.connect(self.set_ground)
+        self.ground.clear_clicked.connect(self.clear_ground)
+        stats_zone.head_layout.addWidget(self.ground)
         stats_zone.body.addLayout(grid_of(list(self.stats.values()), columns=8))
         wrap = QHBoxLayout()
         wrap.setContentsMargins(8, 0, 8, 0)
@@ -164,6 +168,24 @@ class MainWindow(QMainWindow):
     def set_window(self, seconds):
         self.window_s = seconds
         self.drawn_version = -1  # Fuerza repintado
+        self.next_redraw_at = 0.0
+
+    def set_ground(self):
+        if not self.store.set_ground():
+            global_state.add_log("No se puede fijar la rampa: aún no hay datos del barómetro",
+                                 LogLevel.WARNING)
+            return
+        global_state.add_log(f"Rampa fijada a {fmt(self.store.ground_alt)} m: altitud y apogeo "
+                             "se miden desde aquí")
+        self._ground_changed()
+
+    def clear_ground(self):
+        self.store.clear_ground()
+        global_state.add_log("Rampa quitada: altitud en bruto del barómetro")
+        self._ground_changed()
+
+    def _ground_changed(self):
+        self.ground.set_ground(self.store.ground_alt)
         self.next_redraw_at = 0.0
 
     def apply_theme(self, theme: str):
@@ -258,10 +280,13 @@ class MainWindow(QMainWindow):
         b = {k: v[b0:] for k, v in s.baro.cols.items()}
         i = {k: v[i0:] for k, v in s.imu.cols.items()}
 
+        # Altitud y apogeo respecto a la rampa, si está fijada
+        altitude = s.altitude_agl(b["altitude"])
+        apogee_alt = s.altitude_agl(s.apogee[1]) if s.apogee else None
         apogee = None
         if s.apogee and (x_min is None or s.apogee[0] >= x_min):
-            apogee = ([s.apogee[0]], [s.apogee[1]])
-        self.plots["altitude"].set_data(bt, [b["altitude"]], x_range, marker=apogee)
+            apogee = ([s.apogee[0]], [apogee_alt])
+        self.plots["altitude"].set_data(bt, [altitude], x_range, marker=apogee)
         self.plots["vz"].set_data(bt, [b["vz"]], x_range)
         self.plots["accel"].set_data(it, [i["amag"], i["ax"], i["ay"], i["az"]], x_range)
         self.plots["gyro"].set_data(it, [i["gx"], i["gy"], i["gz"]], x_range)
@@ -271,8 +296,8 @@ class MainWindow(QMainWindow):
         last_b = lambda k: s.baro.last(k)
         last_i = lambda k: s.imu.last(k)
         pressure = last_b("pressure")
-        self.stats["altitude"].set(fmt(last_b("altitude")), b["altitude"])
-        self.stats["apogee"].set(fmt(s.apogee[1] if s.apogee else None),
+        self.stats["altitude"].set(fmt(s.altitude_agl(last_b("altitude"))), altitude)
+        self.stats["apogee"].set(fmt(apogee_alt),
                                  sub=f"T+ {fmt(s.apogee[0], 1)} s" if s.apogee else "")
         self.stats["vz"].set(fmt(last_b("vz")), b["vz"])
         self.stats["accel"].set(fmt(last_i("amag"), 2), i["amag"], sub=f"máx {fmt(s.max_g, 2)} g")

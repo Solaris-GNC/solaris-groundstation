@@ -15,6 +15,7 @@ MAX_SAMPLES = 200_000      # Por serie: ~10 h de IMU al ritmo actual del enlace
 STALE_S = 3.0              # Sin muestras nuevas durante este tiempo -> "Sin datos"
 RATE_WINDOW_S = 5.0        # Ventana para calcular muestras/s
 VZ_MAX_DT_S = 5.0          # Huecos mayores no se derivan (demasiados paquetes perdidos)
+GROUND_AVG_S = 2.0         # Al fijar la rampa, la altitud de referencia es la media de estos segundos
 
 # Eje del sensor alineado con el eje longitudinal del cohete: el morro va por +Y de la placa
 # (con el cohete en vertical, ay ≈ 1 g). Cambiar si se monta de otra forma.
@@ -137,8 +138,12 @@ class Store:
     imu: Series = field(default_factory=lambda: Series(
         ["ax", "ay", "az", "amag", "gx", "gy", "gz", "tilt", "roll", "pitch", "yaw"]))
     fsm: dict | None = None                  # Último paquete de init bits (sobrevive a reinicios)
-    apogee: tuple[float, float] | None = None  # (t, altitud)
+    apogee: tuple[float, float] | None = None  # (t, altitud en bruto)
     max_g: float | None = None
+    # Altitud (en bruto) de la rampa: la altitud, el apogeo y las gráficas se dan respecto a ella.
+    # La serie guarda siempre la altitud en bruto; la resta se hace al leer (altitude_agl).
+    # Sobrevive a los reinicios de la placa: la altitud del firmware no depende del arranque
+    ground_alt: float | None = None
     reboots: int = 0                         # Reinicios de la placa detectados en esta sesión
     last_sample_at: float | None = None      # time.monotonic() de la última muestra nueva
     sample_times: list[float] = field(default_factory=list)
@@ -197,6 +202,31 @@ class Store:
                         tilt=tilt, roll=roll, pitch=pitch, yaw=yaw)
         self.max_g = amag if self.max_g is None else max(self.max_g, amag)
         self._mark_new(now)
+
+    def set_ground(self) -> bool:
+        """Fija la rampa: la altitud actual (media de los últimos GROUND_AVG_S) pasa a ser 0 y se
+        olvidan el apogeo y la aceleración máxima acumulados en tierra. False si no hay barómetro."""
+        if not len(self.baro):
+            return False
+        t, alt = self.baro.t, self.baro.cols["altitude"]
+        self.ground_alt = float(np.mean(alt[t >= t[-1] - GROUND_AVG_S]))
+        self.apogee = None
+        self.max_g = None
+        self.version += 1
+        return True
+
+    def clear_ground(self):
+        self.ground_alt = None
+        # El apogeo vuelve a contar toda la sesión
+        self.apogee = None
+        if len(self.baro):
+            k = int(np.argmax(self.baro.cols["altitude"]))
+            self.apogee = (float(self.baro.t[k]), float(self.baro.cols["altitude"][k]))
+        self.version += 1
+
+    def altitude_agl(self, altitude):
+        """Altitud (o array de altitudes) respecto a la rampa; sin rampa fijada, tal cual."""
+        return altitude if self.ground_alt is None or altitude is None else altitude - self.ground_alt
 
     def set_fsm(self, timestamp_ms: int, fsm_errors: int, common_errors: int, failed: list[str]):
         self.fsm = {"timestamp_ms": timestamp_ms, "fsm_errors": fsm_errors,

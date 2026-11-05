@@ -74,6 +74,10 @@ def stylesheet(c: dict, family: str) -> str:
                               padding: 5px 11px; }}
     #segmented QPushButton + QPushButton {{ border-left: 1px solid {c['border_strong']}; }}
     #segmented QPushButton:hover {{ color: {c['text_strong']}; }}
+    /* Botones sueltos de las cabeceras y paneles */
+    #topButton {{ background: transparent; color: {c['muted']}; border: 1px solid {c['border_strong']};
+                  border-radius: 2px; padding: 5px 11px; }}
+    #topButton:hover {{ color: {c['text_strong']}; }}
     #segmented QPushButton:checked {{ background: {c['panel_2']}; color: {c['text_strong']};
                                       font-weight: 600; }}
 
