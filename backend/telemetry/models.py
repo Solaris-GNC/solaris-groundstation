@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Union, Optional
 from enum import Enum
 
@@ -50,12 +50,16 @@ class SPPSecondaryHeader(BaseModel):
 # BARO (BMP) · payload_len esperado ~12 (3 floats)
 #TODO: asignar rangos de validación según datasheet
 class BAROPacket(BaseModel):
+    # NaN/inf (sensor sin inicializar, trama corrupta que pasa el CRC) se rechazan: en las gráficas
+    # y en la orientación 3D un solo NaN lo estropea todo
+    model_config = ConfigDict(allow_inf_nan=False)
     altitude: float = Field(...)      # metros
     pressure: float = Field(...)      # Pa
     temperature: float = Field(...)   # ºC
 
 # ==================================================================
 class IMUPacket(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     accel_x: float = Field(...)   # G
     accel_y: float = Field(...)
     accel_z: float = Field(...)

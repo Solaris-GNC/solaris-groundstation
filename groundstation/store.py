@@ -173,6 +173,10 @@ class ViewOrientation:
         """r_dmp: rocket_matrix() del DMP. gyro_dps: giróscopio en ejes de la placa (°/s)."""
         gyro = np.radians(np.asarray(gyro_dps, dtype=float)[list(_BODY_AXES[ROCKET_AXIS])])
         up = r_dmp[2]                                   # Vertical en ejes del cohete, según el DMP
+        # Cuaternión nulo (DMP sin arrancar) o valores no finitos: una sola muestra así dejaría la
+        # orientación en NaN para siempre. Se ignora la muestra
+        if not (np.all(np.isfinite(up)) and np.all(np.isfinite(gyro)) and np.linalg.norm(up) > 0.5):
+            return
         if self.matrix is None:
             self.matrix, self.t, self.gyro = align_up(up), t, gyro
             return

@@ -51,3 +51,23 @@ def test_fsm_payload_lists_failed_bits():
 def test_unknown_payload_length_is_rejected():
     with pytest.raises(ValueError):
         Decoder().frame_to_packet(make_frame(APID_IMU, bytes(20)))
+
+
+def test_garbage_that_passes_the_crc_is_rejected():
+    # El framer solo mira el CRC: en ruido, 1 de cada 65536 ventanas cuadra por azar. El decoder
+    # (versión, longitud de payload, rangos) tiene que pararlas
+    import random
+    rng = random.Random(5)
+    for _ in range(3000):
+        with pytest.raises(Exception):
+            Decoder().frame_to_packet(bytes(rng.randrange(256) for _ in range(64)))
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_values_are_rejected(bad):
+    values = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    values[6] = bad                           # quat_w
+    with pytest.raises(Exception, match="quat_w"):
+        Decoder().frame_to_packet(make_frame(APID_IMU, struct.pack("<11f", *values)))
+    with pytest.raises(Exception, match="altitude"):
+        Decoder().frame_to_packet(make_frame(APID_BARO, struct.pack("<3f", bad, 1.0, 1.0)))
