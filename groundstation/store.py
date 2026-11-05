@@ -17,9 +17,9 @@ RATE_WINDOW_S = 5.0        # Ventana para calcular muestras/s
 VZ_ALPHA = 0.5             # Suavizado (EMA) de la velocidad vertical derivada del barómetro
 VZ_MAX_DT_S = 5.0          # Huecos mayores no se derivan (demasiados paquetes perdidos)
 
-# Eje del sensor alineado con el eje longitudinal del cohete.
-# Se asume Z (en banco, con la placa plana, az ≈ 1 g). Cambiar si se monta de otra forma.
-ROCKET_AXIS = "z"
+# Eje del sensor alineado con el eje longitudinal del cohete: el morro va por +Y de la placa
+# (con el cohete en vertical, ay ≈ 1 g). Cambiar si se monta de otra forma.
+ROCKET_AXIS = "y"
 
 # Init bits: módulos que se muestran y qué bits les afectan.
 # Los bits de UART no se muestran: el UART no se usa en vuelo.
@@ -37,7 +37,22 @@ INIT_MODULES = [
 
 # Ejes del cuerpo reordenados (permutación cíclica, conserva la orientación) para que el eje
 # del cohete haga de Z
-_BODY_AXES = {"x": (1, 2, 0), "y": (2, 0, 1), "z": (0, 1, 2)}
+_BODY_AXES = {
+    "z": (0, 1, 2),  # morro por +Z de la placa (placa plana)
+    "x": (1, 2, 0),  # morro por +X de la placa
+    "y": (2, 0, 1),  # morro por +Y de la placa (actual)
+}
+
+
+def rocket_matrix(w: float, x: float, y: float, z: float) -> np.ndarray:
+    """Matriz de rotación cuerpo -> mundo con los ejes del cuerpo reordenados según ROCKET_AXIS:
+    su columna 2 es el eje del cohete (el morro) en ejes del mundo."""
+    r = np.array((
+        (1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)),
+        (2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)),
+        (2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)),
+    ))
+    return r[:, _BODY_AXES[ROCKET_AXIS]]
 
 
 def attitude(w: float, x: float, y: float, z: float) -> tuple[float, float, float, float]:
@@ -58,20 +73,13 @@ def attitude(w: float, x: float, y: float, z: float) -> tuple[float, float, floa
     Los ejes X/Y del mundo los fija el DMP con el magnetómetro, así que el roll absoluto
     depende de su calibración; su variación (el giro) es fiable.
     """
-    # Matriz de rotación cuerpo -> mundo
-    r = (
-        (1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)),
-        (2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)),
-        (2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)),
-    )
-    i, j, k = _BODY_AXES[ROCKET_AXIS]
-    r = [(row[i], row[j], row[k]) for row in r]
+    r = rocket_matrix(w, x, y, z)
     # R = Rx(pitch) · Ry(yaw) · Rz(roll)
     tilt = math.acos(max(-1.0, min(1.0, r[2][2])))
     pitch = math.atan2(-r[1][2], r[2][2])
     yaw = math.asin(max(-1.0, min(1.0, r[0][2])))
     roll = math.atan2(-r[0][1], r[0][0])
-    return math.degrees(tilt), math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
+    return (math.degrees(tilt), math.degrees(roll), math.degrees(pitch), math.degrees(yaw))
 
 
 class Series:

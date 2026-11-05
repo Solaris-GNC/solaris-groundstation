@@ -2,6 +2,7 @@ import math
 
 import pytest
 
+from groundstation import store as store_module
 from groundstation.store import Store, attitude
 
 QUAT_UP = (1.0, 0.0, 0.0, 0.0)
@@ -25,6 +26,22 @@ def add_imu(store, ts, quat=QUAT_UP, accel=(0.0, 0.0, 1.0)):
 
 # ==================================================================
 # Actitud
+# La geometría se prueba con el morro por +Z de la placa (ROCKET_AXIS = "z"): con otro eje solo
+# cambia qué columna del cuerpo es el morro, y eso lo prueba test_rocket_axis_y
+
+@pytest.fixture(autouse=True)
+def nose_along_z(monkeypatch):
+    monkeypatch.setattr(store_module, "ROCKET_AXIS", "z")
+
+
+def test_rocket_axis_y(monkeypatch):
+    # Morro por +Y de la placa: con la placa sin girar el cohete está tumbado; girando la placa
+    # 90º sobre X (+Y del cuerpo pasa a +Z del mundo) queda vertical
+    monkeypatch.setattr(store_module, "ROCKET_AXIS", "y")
+    assert attitude(*QUAT_UP)[0] == pytest.approx(90)
+    tilt, _, pitch, yaw = attitude(*axis_angle((1, 0, 0), 90))
+    assert (tilt, pitch, yaw) == pytest.approx((0, 0, 0), abs=1e-9)
+
 
 def test_attitude_upright_is_zero():
     assert attitude(*QUAT_UP) == pytest.approx((0, 0, 0, 0))
