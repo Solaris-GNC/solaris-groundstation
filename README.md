@@ -108,30 +108,6 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
 - `--replay` sirve para probar sin hardware: no escribe nada en `logs/`.
 - `--baud` (por defecto 9600), `--replay-fps` (por defecto 8), `--theme light|dark`.
 
-## Notas
-
-- Llega cada paquete a la pantalla, sin pasar por un servidor.
-- Las gráficas reciben solo la ventana visible y se repintan solo con datos nuevos. Si repintar
-  tarda (sesiones muy largas en "Todo"), se repinta menos a menudo en vez de congelarse.
-- El botón "Orientación 3D" de la cabecera abre una ventana aparte con el cohete en 3D, adaptado
-  de [Rocket-orientation-visualization](https://github.com/voltia999/Rocket-orientation-visualization).
-  Se pinta con QPainter (sin navegador ni OpenGL). Usa la inclinación del DMP y el rumbo del
-  giróscopio integrado (`store.ViewOrientation`): el rumbo del DMP depende del magnetómetro y se
-  desvía decenas de grados en segundos con la placa quieta. "Centrar vista", con el cohete en
-  vertical y la cara de componentes de la placa hacia ti, orienta la vista desde donde estás.
-  En la rampa, "Rampa hacia [acimut] → Orientar" gira la vista para que la inclinación del cohete
-  apunte al acimut de la rampa: queda orientada al norte, con los puntos cardinales en el suelo
-  (la rampa tiene que estar inclinada al menos 3°).
-  Arrastrar con el ratón gira la vista; doble clic la devuelve a la inicial.
-- F11 pone a pantalla completa la ventana activa (la principal o la 3D); Esc la quita.
-- "Fijar rampa" (bloque Medidas): con el cohete en la rampa, la altitud actual (media de 2 s) pasa
-  a ser 0 y las gráficas, el apogeo y la aceleración máxima empiezan de cero, para que en vuelo no
-  arrastren lo acumulado en tierra ni la deriva del barómetro durante la espera. No toca la
-  orientación de la vista 3D. Los CSV guardan siempre todo en bruto.
-- El icono es la insignia de Solaris (`groundstation/assets/solaris_insignia.svg`). En Windows sale
-  solo; en Linux, ver el paso opcional de la instalación.
-- La fuente Oxanium va en `groundstation/assets/fonts` con su licencia (SIL OFL 1.1).
-
 ## Tests
 
 ```bash
