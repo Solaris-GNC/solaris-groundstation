@@ -44,6 +44,21 @@ uv sync                                           # crea .venv con la app y las 
 uv run python -m groundstation                    # busca el receptor solo
 ```
 
+**Opcional: icono en el dock y en el menú de aplicaciones**
+
+Sin esto la app funciona igual, pero en GNOME el dock enseña un icono genérico (o el de la terminal
+desde la que se lanza): desde GNOME 44 el icono solo sale de un `.desktop` instalado. Una vez:
+
+```bash
+scripts/install-desktop.sh                         # con uv
+scripts/install-desktop.sh --python /ruta/python   # o con otro Python (p. ej. un entorno conda)
+```
+
+Escribe `~/.local/share/applications/solaris-groundstation.desktop` apuntando a esta copia del
+repo. Desde entonces la insignia de Solaris sale en el dock, aunque se lance desde la terminal, y
+la app se puede abrir desde el buscador de aplicaciones como "Solaris Ground Station". Si se mueve
+la carpeta del repo hay que repetirlo; para quitarlo: `scripts/install-desktop.sh --uninstall`.
+
 ### Windows
 
 En PowerShell:
@@ -113,6 +128,8 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
   a ser 0 y las gráficas, el apogeo y la aceleración máxima empiezan de cero, para que en vuelo no
   arrastren lo acumulado en tierra ni la deriva del barómetro durante la espera. No toca la
   orientación de la vista 3D. Los CSV guardan siempre todo en bruto.
+- El icono es la insignia de Solaris (`groundstation/assets/solaris_insignia.svg`). En Windows sale
+  solo; en Linux, ver el paso opcional de la instalación.
 - La fuente Oxanium va en `groundstation/assets/fonts` con su licencia (SIL OFL 1.1).
 
 ## Tests

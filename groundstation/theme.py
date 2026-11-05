@@ -5,11 +5,21 @@ Heredado del dashboard web de solaris-live-telemetry (index.css y theme.ts).
 
 from pathlib import Path
 
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtGui import QFontDatabase, QIcon
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 FONT_FILE = ASSETS / "fonts" / "Oxanium.ttf"
 LOGOS = {"light": ASSETS / "logo_solaris_light.png", "dark": ASSETS / "logo_solaris_dark.png"}
+APP_ICON = ASSETS / "solaris_insignia.svg"  # Icono de las ventanas y de la barra de tareas
+
+
+def app_icon() -> QIcon:
+    """La insignia a varios tamaños: de un SVG suelto Qt solo publica 32 px en X11, y el dock de
+    GNOME lo enseña a 48-64 px o más."""
+    icon = QIcon()
+    for size in (16, 24, 32, 48, 64, 128, 256):
+        icon.addPixmap(QIcon(str(APP_ICON)).pixmap(size, size))
+    return icon
 
 # Oxanium en todo (sus cifras tienen ancho fijo: los números no bailan al cambiar)
 FONT_FAMILY = "Oxanium"

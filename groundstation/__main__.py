@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+# Nombre del .desktop (scripts/install-desktop.sh): GNOME saca de él el icono del dock
+DESKTOP_FILE_NAME = "solaris-groundstation"
 
 
 def main():
@@ -38,11 +40,13 @@ def main():
     from PySide6.QtWidgets import QApplication
 
     from .source import TelemetrySource
-    from .theme import load_font
+    from .theme import app_icon, load_font
     from .window import MainWindow
 
     app = QApplication(sys.argv)
     app.setApplicationName("Solaris Ground Station")
+    app.setWindowIcon(app_icon())  # Lo heredan todas las ventanas (también la 3D)
+    app.setDesktopFileName(DESKTOP_FILE_NAME)
     # segmentedLineMode: con antialiasing, Qt pinta muy despacio las líneas de más de 1 px
     # (250 ms frente a 12 ms con 50 000 puntos); por segmentos va igual de bien
     pg.setConfigOptions(antialias=True, segmentedLineMode="on")
