@@ -26,6 +26,7 @@ THEMES = {
         # Gráficas
         "x": "#2a78d6", "y": "#eb6834", "z": "#1baf7a", "ink": "#2b2a27",
         "chart_muted": "#898781", "grid": "#e8e7e1", "axis": "#c3c2b7",
+        "rocket": "#d4002a",
     },
     "dark": {
         "bg": "#050505", "zone": "#111110", "zone_border": "#2a2a27",
@@ -36,6 +37,7 @@ THEMES = {
         "warn": "#e0a43a",
         "x": "#3987e5", "y": "#d95926", "z": "#199e70", "ink": "#e6e5e0",
         "chart_muted": "#898781", "grid": "#2c2c2a", "axis": "#383835",
+        "rocket": "#ff2a4d",
     },
 }
 

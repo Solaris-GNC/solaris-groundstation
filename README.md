@@ -52,6 +52,13 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
 - Llega cada paquete a la pantalla, sin pasar por un servidor.
 - Las gráficas reciben solo la ventana visible y se repintan solo con datos nuevos. Si repintar
   tarda (sesiones muy largas en "Todo"), se repinta menos a menudo en vez de congelarse.
+- El botón "Orientación 3D" de la cabecera abre una ventana aparte con el cohete en 3D, adaptado
+  de [Rocket-orientation-visualization](https://github.com/voltia999/Rocket-orientation-visualization).
+  Se pinta con QPainter (sin navegador ni OpenGL). Usa la inclinación del DMP y el rumbo del
+  giróscopio integrado (`store.ViewOrientation`): el rumbo del DMP depende del magnetómetro y se
+  desvía decenas de grados en segundos con la placa quieta. "Centrar vista", con el cohete en
+  vertical y la cara de componentes de la placa hacia ti, orienta la vista desde donde estás.
+  Arrastrar con el ratón gira la vista; doble clic la devuelve a la inicial.
 - "Fijar rampa" (bloque Medidas): con el cohete en la rampa, la altitud actual (media de 2 s) pasa
   a ser 0 y se borran el apogeo y la aceleración máxima acumulados en tierra, para que en vuelo no
   arrastren la deriva del barómetro durante la espera. No toca la actitud. Los CSV guardan siempre

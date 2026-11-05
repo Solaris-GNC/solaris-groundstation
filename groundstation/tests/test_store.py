@@ -76,6 +76,46 @@ def test_pitch_and_yaw_combined():
 
 
 # ==================================================================
+# Orientación de la vista 3D (inclinación del DMP + rumbo del giróscopio)
+
+def test_view_ignores_dmp_heading_drift_and_follows_roll():
+    # Cohete vertical; gira 90º sobre su eje y después se inclina 45º hacia +X del mundo inicial.
+    # El DMP añade una deriva de rumbo de 60º; el giróscopio mide solo el movimiento real
+    s = Store()
+    q, t, dt = QUAT_UP, 0, 100
+    def feed(q, gyro, drift):
+        nonlocal t
+        add = quat_mul(axis_angle((0, 0, 1), drift), q)
+        s.add_imu(t, (0, 0, 1), gyro, add, now=t / 1000)
+        t += dt
+    feed(q, (0, 0, 0), 0)
+    s.view.center()
+    drift = 0
+    for _ in range(10):                          # Roll: 9º por muestra, 90 º/s sobre el eje
+        q = quat_mul(q, axis_angle((0, 0, 1), 9))
+        drift += 3
+        feed(q, (0, 0, 90.0), drift)
+    for _ in range(9):                           # Inclinación: 5º por muestra sobre Y del mundo
+        q = quat_mul(axis_angle((0, 1, 0), 5), q)
+        drift += 3
+        # Giro sobre un eje fijo del mundo: en ejes del cuerpo es R^T · eje, a 50 º/s
+        feed(q, tuple(50 * store_module.rocket_matrix(*q).T @ (0, 1, 0)), drift)
+    nose = s.view.matrix[:, 2]
+    assert nose == pytest.approx([math.sin(math.radians(45)), 0, math.cos(math.radians(45))], abs=0.02)
+
+
+def test_view_does_not_drift_at_rest():
+    s = Store()
+    tilted = axis_angle((0, 1, 0), 30)
+    for k in range(50):
+        # El DMP desvía el rumbo 2º por muestra; el giróscopio solo tiene ruido de 0.3 º/s
+        q = quat_mul(axis_angle((0, 0, 1), 2 * k), tilted)
+        s.add_imu(k * 100, (0, 0, 1), (0.3, -0.2, 0.1), q, now=k / 10)
+    nose = s.view.matrix[:, 2]
+    assert nose == pytest.approx([0.5, 0, math.cos(math.radians(30))], abs=1e-6)
+
+
+# ==================================================================
 # Store
 
 def test_duplicate_samples_are_ignored():

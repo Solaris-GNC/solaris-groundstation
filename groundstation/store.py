@@ -15,6 +15,8 @@ MAX_SAMPLES = 200_000      # Por serie: ~10 h de IMU al ritmo actual del enlace
 STALE_S = 3.0              # Sin muestras nuevas durante este tiempo -> "Sin datos"
 RATE_WINDOW_S = 5.0        # Ventana para calcular muestras/s
 VZ_MAX_DT_S = 5.0          # Huecos mayores no se derivan (demasiados paquetes perdidos)
+VIEW_GYRO_DEADBAND_DPS = 1.0  # Vista 3D: giros más lentos se toman como ruido/sesgo del giróscopio
+VIEW_MAX_GYRO_DT_S = 1.0      # Vista 3D: con huecos mayores no se integra el giróscopio
 GROUND_AVG_S = 2.0         # Al fijar la rampa, la altitud de referencia es la media de estos segundos
 
 # Eje del sensor alineado con el eje longitudinal del cohete: el morro va por +Y de la placa
@@ -82,6 +84,75 @@ def attitude(w: float, x: float, y: float, z: float) -> tuple[float, float, floa
     return (math.degrees(tilt), math.degrees(roll), math.degrees(pitch), math.degrees(yaw))
 
 
+def align_up(v) -> np.ndarray:
+    """Giro mínimo que lleva el vector v a +Z (gira sobre un eje horizontal: no cambia el rumbo)."""
+    v = np.asarray(v, dtype=float) / np.linalg.norm(v)
+    axis = np.cross(v, (0.0, 0.0, 1.0))
+    s, c = np.linalg.norm(axis), v[2]
+    if s < 1e-9:
+        # Ya está arriba (identidad) o justo abajo (media vuelta sobre X)
+        return np.eye(3) if c > 0 else np.diag([1.0, -1.0, -1.0])
+    k = axis / s
+    kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + s * kx + (1 - c) * kx @ kx
+
+
+def _rotvec(w) -> np.ndarray:
+    """Matriz de giro de un vector de rotación (eje · ángulo en rad)."""
+    a = np.linalg.norm(w)
+    if a < 1e-12:
+        return np.eye(3)
+    k = w / a
+    kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + math.sin(a) * kx + (1 - math.cos(a)) * kx @ kx
+
+
+class ViewOrientation:
+    """Orientación del cohete para la vista 3D: inclinación del DMP y rumbo del giróscopio.
+
+    El rumbo del DMP (giro alrededor de la vertical) depende del magnetómetro y se desvía decenas
+    de grados en segundos con la placa quieta; su inclinación sí es fiable (coincide con el
+    acelerómetro). Aquí se integra el giróscopio (en ejes del cohete) y en cada muestra se corrige
+    la inclinación con la del DMP girando sobre un eje horizontal, sin tocar el rumbo. Así el
+    rumbo solo cambia cuando el giróscopio mide giro, y girar el cohete sobre su eje se ve como
+    tal. Los giros por debajo de VIEW_GYRO_DEADBAND_DPS se ignoran para que no derive en reposo.
+
+    El rumbo no tiene referencia absoluta: center() lo fija con la orientación actual (la cara
+    de la placa hacia la cámara). Se centra solo con la primera muestra.
+    `matrix`: cuerpo del cohete (columnas de rocket_matrix) -> ejes de la vista, Z arriba.
+    """
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.matrix: np.ndarray | None = None
+        self.t: float | None = None
+        self.gyro: np.ndarray | None = None
+
+    def center(self):
+        if self.matrix is not None:
+            # Fila 2: la vertical en ejes del cohete. Se deja solo la inclinación, rumbo 0
+            self.matrix = align_up(self.matrix[2])
+
+    def update(self, t: float, r_dmp: np.ndarray, gyro_dps) -> None:
+        """r_dmp: rocket_matrix() del DMP. gyro_dps: giróscopio en ejes de la placa (°/s)."""
+        gyro = np.radians(np.asarray(gyro_dps, dtype=float)[list(_BODY_AXES[ROCKET_AXIS])])
+        up = r_dmp[2]                                   # Vertical en ejes del cohete, según el DMP
+        if self.matrix is None:
+            self.matrix, self.t, self.gyro = align_up(up), t, gyro
+            return
+        dt = t - self.t
+        r = self.matrix
+        if 0 < dt <= VIEW_MAX_GYRO_DT_S:
+            w = (gyro + self.gyro) / 2                  # Trapecio entre las dos muestras
+            if np.degrees(np.linalg.norm(w)) >= VIEW_GYRO_DEADBAND_DPS:
+                r = r @ _rotvec(w * dt)
+        # Corrección de inclinación: la vertical del DMP, llevada a la vista, se gira a +Z
+        self.matrix = align_up(r @ up) @ r
+        self.t, self.gyro = t, gyro
+
+
 class Series:
     """Columnas de una serie temporal: t (s desde el arranque de la placa) y un valor por campo.
 
@@ -144,6 +215,7 @@ class Store:
     # La serie guarda siempre la altitud en bruto; la resta se hace al leer (altitude_agl).
     # Sobrevive a los reinicios de la placa: la altitud del firmware no depende del arranque
     ground_alt: float | None = None
+    view: ViewOrientation = field(default_factory=ViewOrientation)  # Para la vista 3D
     reboots: int = 0                         # Reinicios de la placa detectados en esta sesión
     last_sample_at: float | None = None      # time.monotonic() de la última muestra nueva
     sample_times: list[float] = field(default_factory=list)
@@ -156,6 +228,7 @@ class Store:
         self.imu = Series(self.imu.fields)
         self.apogee = None
         self.max_g = None
+        self.view.reset()
         self.reboots += 1
 
     def _check_reboot(self, series: Series, t: float) -> bool:
@@ -198,6 +271,7 @@ class Store:
         ax, ay, az = accel
         amag = math.sqrt(ax * ax + ay * ay + az * az)
         tilt, roll, pitch, yaw = attitude(*quat)
+        self.view.update(t, rocket_matrix(*quat), gyro)
         self.imu.append(t, ax=ax, ay=ay, az=az, amag=amag, gx=gyro[0], gy=gyro[1], gz=gyro[2],
                         tilt=tilt, roll=roll, pitch=pitch, yaw=yaw)
         self.max_g = amag if self.max_g is None else max(self.max_g, amag)

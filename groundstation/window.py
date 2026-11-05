@@ -5,11 +5,14 @@ import time
 
 from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget,
+)
 
 from backend.telemetry.models import BAROPacket, FSMPacket, IMUPacket, LogLevel
 from backend.telemetry.state import global_state
 
+from .attitude_view import OrientationWindow
 from .source import TelemetrySource
 from .store import Store
 from .theme import LOGOS, THEMES, stylesheet
@@ -43,8 +46,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Solaris · Ground station")
         self.setMinimumSize(1200, 760)
         self.resize(1440, 900)
+        self.orientation = OrientationWindow(self)
+        self.orientation.center_requested.connect(self.center_view)
         self._build()
         self.apply_theme(self.theme)
+        if self.settings.value("orientation_open", False, type=bool):
+            self.open_orientation()
 
         self.timer = QTimer(self, interval=REFRESH_MS, timeout=self.tick)
         self.timer.start()
@@ -154,6 +161,12 @@ class MainWindow(QMainWindow):
         self.clock = QLabel("T+ 0.0 s", objectName="clock", alignment=Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(self.clock)
 
+        orientation = QPushButton("Orientación 3D", objectName="topButton")
+        orientation.setCursor(Qt.PointingHandCursor)
+        orientation.setToolTip("Abre una ventana con el cohete en 3D")
+        orientation.clicked.connect(self.open_orientation)
+        layout.addWidget(orientation)
+
         windows = Segmented(WINDOWS, self.window_s)
         windows.changed.connect(self.set_window)
         layout.addWidget(windows)
@@ -188,6 +201,21 @@ class MainWindow(QMainWindow):
         self.ground.set_ground(self.store.ground_alt)
         self.next_redraw_at = 0.0
 
+    def center_view(self):
+        self.store.view.center()
+        self.store.version += 1  # Repinta aunque no lleguen datos
+        self.next_redraw_at = 0.0
+
+    def open_orientation(self):
+        geometry = self.settings.value("orientation_geometry")
+        if geometry is not None and not self.orientation.isVisible():
+            self.orientation.restoreGeometry(geometry)
+        self.orientation.show()
+        self.orientation.raise_()
+        self.orientation.activateWindow()
+        self.drawn_version = -1  # Mientras está cerrada no se rellena: se pone al día
+        self.next_redraw_at = 0.0
+
     def apply_theme(self, theme: str):
         self.theme = theme
         self.settings.setValue("theme", theme)
@@ -200,6 +228,7 @@ class MainWindow(QMainWindow):
             plot.set_theme(c, self.family)
         for card in self.stats.values():
             card.set_theme(c)
+        self.orientation.set_theme(c, self.family)
         self.init_bits.set_theme(c)
         self.events.set_theme(c)
         self.drawn_version = -1
@@ -292,6 +321,8 @@ class MainWindow(QMainWindow):
         self.plots["gyro"].set_data(it, [i["gx"], i["gy"], i["gz"]], x_range)
         self.plots["attitude"].set_data(it, [i["tilt"], i["pitch"], i["yaw"]], x_range)
         self.plots["roll"].set_data(*break_wraps(it, i["roll"]), x_range)
+        if self.orientation.isVisible():
+            self.orientation.set_attitude(s)
 
         last_b = lambda k: s.baro.last(k)
         last_i = lambda k: s.imu.last(k)
@@ -307,5 +338,9 @@ class MainWindow(QMainWindow):
                                    b["pressure"])
 
     def closeEvent(self, event):
+        # Se recuerda si la ventana de orientación estaba abierta y dónde, para la próxima vez
+        self.settings.setValue("orientation_open", self.orientation.isVisible())
+        self.settings.setValue("orientation_geometry", self.orientation.saveGeometry())
+        self.orientation.close()
         self.source.stop()
         super().closeEvent(event)
