@@ -98,17 +98,16 @@ def test_backwards_timestamp_is_a_reboot():
     assert s.fsm is not None               # Los init bits del arranque se conservan
 
 
-def test_vertical_speed_and_apogee():
+def test_vertical_speed_is_plain_difference_and_apogee():
     s = Store()
     s.add_baro(0, 0.0, 1, 1, now=0)
     s.add_baro(1000, 10.0, 1, 1, now=1)
-    s.add_baro(2000, 30.0, 1, 1, now=2)
-    s.add_baro(3000, 25.0, 1, 1, now=3)
+    s.add_baro(1500, 12.0, 1, 1, now=1.5)
+    s.add_baro(2500, 11.0, 1, 1, now=2.5)
     vz = s.baro.cols["vz"]
     assert math.isnan(vz[0])
-    assert vz[1] == pytest.approx(10)
-    assert vz[2] == pytest.approx(15)      # EMA: 10 + 0.5 * (20 - 10)
-    assert s.apogee == (2.0, 30.0)
+    assert list(vz[1:]) == pytest.approx([10, 4, -1])
+    assert s.apogee == (1.5, 12.0)
 
 
 def test_no_vertical_speed_across_long_gaps():

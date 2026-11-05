@@ -14,7 +14,6 @@ import numpy as np
 MAX_SAMPLES = 200_000      # Por serie: ~10 h de IMU al ritmo actual del enlace
 STALE_S = 3.0              # Sin muestras nuevas durante este tiempo -> "Sin datos"
 RATE_WINDOW_S = 5.0        # Ventana para calcular muestras/s
-VZ_ALPHA = 0.5             # Suavizado (EMA) de la velocidad vertical derivada del barómetro
 VZ_MAX_DT_S = 5.0          # Huecos mayores no se derivan (demasiados paquetes perdidos)
 
 # Eje del sensor alineado con el eje longitudinal del cohete: el morro va por +Y de la placa
@@ -133,6 +132,7 @@ class Series:
 
 @dataclass
 class Store:
+    # Sin filtrar: altitud medida y velocidad vertical como su derivada directa
     baro: Series = field(default_factory=lambda: Series(["altitude", "pressure", "temperature", "vz"]))
     imu: Series = field(default_factory=lambda: Series(
         ["ax", "ay", "az", "amag", "gx", "gy", "gz", "tilt", "roll", "pitch", "yaw"]))
@@ -177,9 +177,7 @@ class Store:
         vz = math.nan
         last_t = self.baro.last_t()
         if last_t is not None and t - last_t <= VZ_MAX_DT_S:
-            raw = (altitude - self.baro.last("altitude")) / (t - last_t)
-            prev = self.baro.last("vz")
-            vz = raw if math.isnan(prev) else prev + VZ_ALPHA * (raw - prev)
+            vz = (altitude - self.baro.last("altitude")) / (t - last_t)
         self.baro.append(t, altitude=altitude, pressure=pressure, temperature=temperature, vz=vz)
         if self.apogee is None or altitude > self.apogee[1]:
             self.apogee = (t, altitude)
