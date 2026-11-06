@@ -7,6 +7,7 @@ Tema de día y de noche con la fuente Oxanium.
 ## Estructura
 
 - `groundstation/`: la app (PySide6 + pyqtgraph).
+- `sdcard/`: volcado y análisis de la SD de vuelo (`python -m sdcard`, ver más abajo).
 - `backend/`: lectura del puerto serie, tramas SPP, decoder y CSV en `logs/` (raw_uart, baro, imu,
   fsm, eventos).
 
@@ -104,6 +105,38 @@ uv run python -m groundstation --replay logs/raw_uart_AAAAMMDD_HHMMSS   # repite
 - Si se desenchufa el receptor, la cabecera muestra "Receptor desconectado" y se reconecta solo.
 - `--replay` sirve para probar sin hardware: no escribe nada en `logs/`.
 - `--baud` (por defecto 9600), `--replay-fps` (por defecto 8), `--theme light|dark`.
+
+## Datos de la SD de vuelo
+
+En vuelo el datalogger guarda cada paquete SPP (64 B) en sectores crudos de la SD, sin particiones
+ni sistema de ficheros, a partir del sector 16384. Después del vuelo, con la SD metida en el
+ordenador:
+
+```bash
+uv run python -m sdcard                         # busca la SD, la vuelca, saca los CSV y el apogeo
+uv run python -m sdcard --device /dev/sda       # sin buscar la SD
+uv run python -m sdcard --bin spp_dump.bin      # analizar un volcado hecho a mano con dd
+```
+
+- **Búsqueda de la SD:** solo cuenta un disco extraíble sin nada montado (la SD de vuelo no tiene
+  sistema de ficheros, así que nunca se monta), y solo se da por buena si en el sector 16384 hay
+  tramas SPP con CRC válido. Antes de volcar pregunta (`-y` para no preguntar). Del disco solo se
+  lee, nunca se escribe en él. Pide la contraseña de sudo para leer `/dev/sdX`.
+- **Volcado:** lee desde el sector 16384 hasta que hay 16 MiB seguidos sin datos (`--stop-empty-mib`)
+  o hasta 1 GiB (`--max-mib`). No hace falta calcular cuántos MiB ocupa el vuelo.
+- **Salida** en `logs/sd_AAAAMMDD_HHMMSS/`: `spp_dump.bin`, los CSV de BARO, IMU y FSM (el mismo
+  formato que en directo), `apogeo.txt` y `altitud.png`. El apogeo sale resaltado en la terminal y
+  en una ventana con la gráfica de altitud (`--no-plot` para no abrirla).
+- **Apogeo:** máximo de la altitud del barómetro tras un filtro de mediana de 5 muestras (un pico
+  suelto no cuenta), sobre la altitud de la rampa (mediana de las 50 primeras muestras). El T+
+  cuenta desde la última vez que la altitud estuvo a menos de 5 m de la rampa.
+- **Sesiones:** cada arranque de la placa vuelve a escribir desde el sector 16384, así que detrás
+  del último vuelo pueden quedar restos de arranques anteriores. Se separan cuando el tiempo del
+  firmware retrocede, el seq de un sensor no avanza o hay un hueco de sectores vacíos, y se analiza
+  la 1 (el último arranque) salvo `--session N`. Unos restos que encajen en tiempo y seq no se
+  pueden separar; solo se avisa del salto de tiempo. Lo seguro es borrar la SD antes de cada vuelo.
+- `--bin` da por hecho que el volcado empieza en el sector 16384 (`skip=16384` en dd). Si no,
+  indicar el sector de inicio con `--first-sector`.
 
 ## Tests
 
