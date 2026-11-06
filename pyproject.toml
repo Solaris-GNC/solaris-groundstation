@@ -26,4 +26,4 @@ package = false   # Es una aplicación: no se construye ni se instala como paque
 [tool.pytest.ini_options]
 # backend/tests importa "telemetry", "comms"... como paquetes de primer nivel
 pythonpath = [".", "backend"]
-testpaths = ["groundstation/tests", "backend/tests"]
+testpaths = ["groundstation/tests", "backend/tests", "sdcard/tests"]
