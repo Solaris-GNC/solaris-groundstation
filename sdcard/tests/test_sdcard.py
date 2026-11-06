@@ -1,3 +1,4 @@
+import json
 import math
 import random
 import struct
@@ -6,6 +7,7 @@ import numpy as np
 
 from backend.comms.crc import crc16_ccitt
 from backend.telemetry.models import APID_BARO, APID_IMU, K_SPP_PKT_VERSION, BAROPacket
+from sdcard import device
 from sdcard.dump import (
     FRAME_SIZE, SECTOR_SIZE, baro_series, decode_dump, find_apogee, find_frames, frame_is_valid,
 )
@@ -132,3 +134,37 @@ def test_duplicates_are_dropped():
     assert len(contents.sessions) == 1
     assert contents.sessions[0].duplicates == 1
     assert len(contents.sessions[0].records) == len(frames)
+
+
+LSBLK = {"blockdevices": [
+    {"name": "nvme0n1", "path": "/dev/nvme0n1", "size": 10**12, "model": "SSD", "tran": "nvme",
+     "rm": False, "hotplug": False, "type": "disk", "mountpoints": [None],
+     "children": [{"name": "nvme0n1p1", "type": "part", "mountpoints": ["/"]}]},
+    {"name": "sda", "path": "/dev/sda", "size": 31914983424, "model": "SD/MMC  ", "tran": "usb",
+     "rm": True, "hotplug": True, "type": "disk", "mountpoints": [None]},
+    {"name": "sdb", "path": "/dev/sdb", "size": 16 * 10**9, "model": "Pendrive", "tran": "usb",
+     "rm": "1", "hotplug": "1", "type": "disk", "mountpoints": [None],
+     "children": [{"name": "sdb1", "type": "part", "mountpoints": ["/run/media/u/PEN"]}]},
+    {"name": "sdc", "path": "/dev/sdc", "size": 0, "model": "Card reader", "tran": "usb",
+     "rm": True, "hotplug": True, "type": "disk", "mountpoints": [None]},
+    {"name": "mmcblk0", "size": "31914983424", "model": None, "tran": None,
+     "rm": "0", "hotplug": "0", "type": "disk", "mountpoint": None},
+]}
+
+
+def test_only_unmounted_removable_disks_are_candidates():
+    disks = device.removable_disks(json.loads(json.dumps(LSBLK)))
+    assert [(d.path, d.model) for d in disks] == [("/dev/sda", "SD/MMC"), ("/dev/mmcblk0", "")]
+
+
+def test_dump_stops_after_the_data(tmp_path):
+    image = tmp_path / "sd.img"
+    data = b"".join(flight(duration_s=20))          # ~140 KiB
+    image.write_bytes(bytes(4 * SECTOR_SIZE) + data + bytes(5 * device.MIB))
+    out = tmp_path / "dump.bin"
+    copied = device.dump_device(str(image), out, offset=4 * SECTOR_SIZE, max_bytes=100 * device.MIB,
+                                stop_after_empty=2 * device.MIB)
+    assert copied == 3 * device.MIB
+    assert out.read_bytes()[:len(data)] == data
+    assert device.has_spp_data(str(image), 4 * SECTOR_SIZE)
+    assert not device.has_spp_data(str(image), 4 * SECTOR_SIZE + len(data) + SECTOR_SIZE)
